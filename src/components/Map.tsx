@@ -1,137 +1,283 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-import { Coffee, Utensils, KeyRound, Banknote } from "lucide-react";
 
-// Fix Leaflet's default icon path issues in Next.js
-const icon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  tooltipAnchor: [16, -28],
-  shadowSize: [41, 41],
-});
+// We need to dynamically import react-leaflet components since Leaflet uses the window object
+import dynamic from 'next/dynamic';
+import { Place, LocationState } from "../lib/types";
 
-// Mock data
-const locations = [
-  {
-    id: 1,
-    name: "The Roasted Bean",
-    type: "cafe",
-    lat: 51.505,
-    lng: -0.09,
-    toiletPassword: "1234*",
-    prices: [
-      { item: "Espresso", price: "$2.50" },
-      { item: "Latte", price: "$4.00" },
-      { item: "Croissant", price: "$3.50" },
-    ],
-  },
-  {
-    id: 2,
-    name: "Pasta Paradiso",
-    type: "restaurant",
-    lat: 51.51,
-    lng: -0.1,
-    toiletPassword: "No password, ask staff",
-    prices: [
-      { item: "Spaghetti Carbonara", price: "$14.00" },
-      { item: "Margherita Pizza", price: "$12.00" },
-      { item: "Tiramisu", price: "$7.00" },
-    ],
-  },
-  {
-    id: 3,
-    name: "Matcha Magic",
-    type: "cafe",
-    lat: 51.508,
-    lng: -0.11,
-    toiletPassword: "8888#",
-    prices: [
-      { item: "Matcha Latte", price: "$5.50" },
-      { item: "Green Tea Cake", price: "$6.00" },
-    ],
-  },
-  {
-      id: 4,
-      name: "Burger Joint",
-      type: "restaurant",
-      lat: 51.503,
-      lng: -0.08,
-      toiletPassword: "None",
-      prices: [
-          { item: "Cheeseburger", price: "$9.00" },
-          { item: "Fries", price: "$4.00" },
-          { item: "Milkshake", price: "$5.00" },
-      ],
-  },
-];
+// Only import what we need dynamically to avoid window errors
+const MapContainer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import('react-leaflet').then((mod) => mod.TileLayer),
+  { ssr: false }
+);
+const Marker = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Marker),
+  { ssr: false }
+);
+const Circle = dynamic(
+  () => import('react-leaflet').then((mod) => mod.Circle),
+  { ssr: false }
+);
 
-export default function MapComponent() {
-  const [mounted, setMounted] = useState(false);
+// MapEventsWrapper component
+const MapEventsWrapper = dynamic(
+  () => import('react-leaflet').then((mod) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return function MapEventsInner({ onZoomEnd, onMoveEnd, setMapRef }: any) {
+        const map = mod.useMapEvents({
+            zoomend: onZoomEnd,
+            moveend: onMoveEnd
+        });
+        useEffect(() => {
+            if (setMapRef) setMapRef(map);
+        }, [map, setMapRef]);
+        return null;
+    }
+  }),
+  { ssr: false }
+);
 
-  // Use a timeout or a simple effect to trigger mount state to avoid sync update warning
+export default function MapComponent({ 
+    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap
+}: { 
+    places: Place[], onSelect: (id: number) => void, selectedId: number | null, isMobile: boolean, 
+    userLocation: LocationState | null, flyToLocation: LocationState | null,
+    onOsmPlacesFetch: (places: Place[]) => void, setIsFetchingMap: (b: boolean) => void
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [L, setL] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [map, setMap] = useState<any>(null);
+  const selectedPlace = places.find(p => p.id === selectedId);
+  const [currentZoom, setCurrentZoom] = useState(15);
+  
+  const fetchRef = useRef<number | null>(null);
+  const [lastFetchBounds, setLastFetchBounds] = useState<string>("");
+
   useEffect(() => {
-    const timer = setTimeout(() => setMounted(true), 10);
-    return () => clearTimeout(timer);
+      // Import leaflet on client side only
+      import('leaflet').then((leaflet) => {
+          setL(leaflet.default || leaflet);
+      });
   }, []);
 
-  if (!mounted) return <div className="h-[600px] w-full animate-pulse bg-gray-200 rounded-lg"></div>;
+  // Map Controller Effect
+  useEffect(() => {
+    if (!map) return;
+    if (flyToLocation) {
+        map.setView([flyToLocation.lat, flyToLocation.lng], 15, { animate: true, duration: 1.5 });
+    } else if (selectedPlace) {
+       const latOffset = isMobile ? -0.002 : 0;
+       map.setView([selectedPlace.lat + latOffset, selectedPlace.lng], 17, { animate: true, duration: 0.5 });
+    } else if (userLocation) {
+        map.setView([userLocation.lat, userLocation.lng], 15, { animate: true });
+    }
+  }, [map, flyToLocation, selectedPlace, isMobile, userLocation]);
+
+  // Overpass Fetcher
+  const fetchPlaces = async () => {
+      if (!map) return;
+      const zoom = map.getZoom();
+      
+      // Require users to zoom in quite far (Zoom 15+) before fetching to avoid Overpass rate limiting
+      if (zoom < 15) {
+           onOsmPlacesFetch([]); 
+           return; 
+      }
+      
+      const bounds = map.getBounds();
+      const boundsStr = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+      
+      if (boundsStr === lastFetchBounds) return;
+      setLastFetchBounds(boundsStr);
+
+      const query = `
+          [out:json][timeout:10];
+          (
+              node["amenity"~"cafe|restaurant"](${boundsStr});
+              way["amenity"~"cafe|restaurant"](${boundsStr});
+          );
+          out center;
+      `;
+
+      setIsFetchingMap(true);
+      
+      const endpoints = [
+          "https://overpass-api.de/api/interpreter",
+          "https://lz4.overpass-api.de/api/interpreter",
+          "https://z.overpass-api.de/api/interpreter",
+          "https://overpass.kumi.systems/api/interpreter"
+      ];
+      
+      let data = null;
+      let success = false;
+
+      for (const endpoint of endpoints) {
+          try {
+              const res = await fetch(endpoint, {
+                  method: "POST",
+                  body: "data=" + encodeURIComponent(query),
+                  headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                  }
+              });
+              
+              if (!res.ok) {
+                  continue;
+              }
+              
+              const text = await res.text();
+              if (text.startsWith("<?xml")) {
+                  continue; // Likely rate limited, try next endpoint
+              }
+              data = JSON.parse(text);
+              success = true;
+              break; // Success!
+          } catch (e) {
+              console.warn(`Endpoint ${endpoint} failed`, e);
+          }
+      }
+
+      setIsFetchingMap(false);
+
+      if (!success || !data) {
+          console.error("All Overpass endpoints failed or returned XML");
+          setLastFetchBounds(""); // Clear bounds to retry later
+          return;
+      }
+
+      try {
+          const newPlaces: Place[] = data.elements
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .filter((el: any) => el.tags?.name)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map((el: any) => {
+                  const lat = el.type === 'node' ? el.lat : el.center.lat;
+                  const lng = el.type === 'node' ? el.lon : el.center.lon;
+                  return {
+                      id: el.id,
+                      name: el.tags!.name || "Unknown",
+                      lat, lng,
+                      type: el.tags!.amenity === 'cafe' ? 'cafe' : 'restaurant',
+                      address: el.tags!['addr:street'] ? `${el.tags!['addr:street']} ${el.tags!['addr:housenumber'] || ''}` : "Address unknown",
+                      toiletPass: null, 
+                      wifiPass: null, 
+                      rating: 0, 
+                      menu: []
+                  };
+              });
+          
+          onOsmPlacesFetch(newPlaces);
+      } catch (e) {
+          console.error("Parsing Overpass data failed", e);
+          setLastFetchBounds(""); // Clear bounds to retry later
+      }
+  };
+
+  const onZoomEnd = () => {
+      if (!map) return;
+      setCurrentZoom(map.getZoom());
+      if (fetchRef.current) clearTimeout(fetchRef.current);
+      fetchRef.current = window.setTimeout(() => fetchPlaces(), 800); // Decreased debounce to 800ms for faster loads
+  };
+
+  const onMoveEnd = () => {
+      if (!map) return;
+      if (fetchRef.current) clearTimeout(fetchRef.current);
+      fetchRef.current = window.setTimeout(() => fetchPlaces(), 800); // Decreased debounce to 800ms for faster loads
+  };
+
+  useEffect(() => {
+      if (map) {
+         fetchPlaces();
+      }
+      return () => { if (fetchRef.current) clearTimeout(fetchRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map]);
+
+
+  if (!L) return <div className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center"><p className="text-gray-400 font-medium">Initializing Map...</p></div>;
+
+  const getCustomIcon = (type: string, isUnclaimed: boolean) => {
+    const isCafe = type === 'cafe';
+    
+    // Explicitly define background color and border styles directly on the div
+    const bgColor = isUnclaimed ? '#9ca3af' : (isCafe ? '#d97706' : '#ea580c');
+    
+    const cafeIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coffee"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>`;
+    const restaurantIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utensils"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>`;
+
+    return L.divIcon({
+      className: 'custom-div-icon',
+      html: `<div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); background-color: ${bgColor}; color: white; opacity: ${isUnclaimed ? 0.8 : 1}; transition: transform 0.2s;">${isCafe ? cafeIconHtml : restaurantIconHtml}</div>`,
+      iconSize: [32, 32],
+      iconAnchor: [16, 16]
+    });
+  };
+
+  const userIcon = L.divIcon({
+    className: 'custom-div-icon',
+    html: `<div style="width: 20px; height: 20px; border-radius: 50%; background-color: #3b82f6; border: 3px solid white; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);"></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10]
+  });
+
+  // Only show markers if zoomed in enough
+  const showMarkers = currentZoom >= 14;
 
   return (
-    <MapContainer
-      center={[51.505, -0.09]}
-      zoom={13}
-      scrollWheelZoom={true}
-      className="h-full w-full rounded-lg shadow-lg z-0"
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-      {locations.map((loc) => (
-        <Marker key={loc.id} position={[loc.lat, loc.lng]} icon={icon}>
-          <Popup className="min-w-[200px]">
-            <div className="p-2 font-sans">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-2">
-                {loc.type === "cafe" ? <Coffee size={20} className="text-amber-700"/> : <Utensils size={20} className="text-blue-600"/>}
-                {loc.name}
-              </h3>
-              
-              <div className="bg-gray-50 p-3 rounded-md border border-gray-100 mb-3">
-                <div className="flex items-center gap-2 text-sm text-gray-700 mb-1 font-semibold">
-                    <KeyRound size={16} className="text-gray-500"/>
-                    Toilet Password
-                </div>
-                <div className="text-sm font-mono bg-white border border-gray-200 p-1.5 rounded text-center text-red-600 tracking-wider">
-                    {loc.toiletPassword}
-                </div>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-md border border-gray-100">
-                <div className="flex items-center gap-2 text-sm text-gray-700 mb-2 font-semibold">
-                    <Banknote size={16} className="text-green-600"/>
-                    Popular Menu
-                </div>
-                <ul className="text-sm space-y-1">
-                  {loc.prices.map((p, index) => (
-                    <li key={index} className="flex justify-between border-b border-gray-200 pb-1 last:border-0 last:pb-0">
-                      <span className="text-gray-600">{p.item}</span>
-                      <span className="font-medium text-gray-900">{p.price}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+    <div style={{ height: "100%", width: "100%", position: "absolute", inset: 0 }}>
+        {!showMarkers && (
+            <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[1000] bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-md border border-gray-200 text-sm font-medium text-gray-600 pointer-events-none whitespace-nowrap">
+                Zoom in to see cafes and restaurants
             </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+        )}
+
+        <MapContainer
+            center={userLocation ? [userLocation.lat, userLocation.lng] : [40.0375, 32.8945]}
+            zoom={15}
+            zoomControl={false}
+            scrollWheelZoom={true}
+            style={{ height: "100%", width: "100%", zIndex: 0 }}
+        >
+            <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors'
+                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                subdomains="abcd"
+                maxZoom={20}
+            />
+            
+            <MapEventsWrapper onZoomEnd={onZoomEnd} onMoveEnd={onMoveEnd} setMapRef={setMap} />
+
+            {showMarkers && places.map((place) => {
+                const isUnclaimed = !place.toiletPass && place.menu.length === 0;
+                return (
+                <Marker 
+                    key={place.id} 
+                    position={[place.lat, place.lng]} 
+                    icon={getCustomIcon(place.type, isUnclaimed)}
+                    eventHandlers={{ click: () => onSelect(place.id) }}
+                />
+            )})}
+
+            {userLocation && (
+                <>
+                    <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
+                    <Circle 
+                        center={[userLocation.lat, userLocation.lng]} 
+                        pathOptions={{ fillColor: '#3b82f6', fillOpacity: 0.1, color: 'transparent' }} 
+                        radius={150} 
+                    />
+                </>
+            )}
+        </MapContainer>
+    </div>
   );
 }

@@ -1,74 +1,439 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { MapPin, Search, Compass, LogIn } from "lucide-react";
+import { 
+    MapPin, Search, Coffee, Utensils, 
+    Star, ArrowLeft, KeyRound, Wifi, Copy, List, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation
+} from "lucide-react";
+import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 
 // Dynamically import the Map component with ssr: false
-// This is necessary because Leaflet uses the window object
 const MapComponent = dynamic(() => import("../components/Map"), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-[calc(100vh-64px)] w-full bg-zinc-100 animate-pulse">
-      <div className="flex flex-col items-center gap-4 text-zinc-400">
-        <MapPin size={48} className="animate-bounce" />
-        <p className="text-xl font-medium tracking-tight">Loading kaf&apos;map...</p>
+    <div className="absolute inset-0 flex items-center justify-center bg-gray-50 animate-pulse">
+      <div className="flex flex-col items-center gap-4 text-gray-400">
+        <MapIcon size={48} className="animate-bounce" />
+        <p className="text-xl font-medium tracking-tight">Loading map...</p>
       </div>
     </div>
   ),
 });
 
 export default function Home() {
-  return (
-    <div className="flex flex-col min-h-screen bg-white font-sans text-zinc-950 selection:bg-rose-200">
-      {/* Navigation Bar */}
-      <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 bg-white/80 backdrop-blur-md border-b border-zinc-200/50 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500 to-orange-400 shadow-inner">
-            <MapPin className="text-white drop-shadow-sm" size={24} />
-          </div>
-          <h1 className="text-2xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-rose-600 to-orange-500">
-            kaf&apos;map
-          </h1>
-        </div>
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const [isMenuFullscreen, setIsMenuFullscreen] = useState(false);
+    const [userLocation, setUserLocation] = useState<LocationState | null>(null);
+    const [isLocating, setIsLocating] = useState(false);
+    const [osmPlaces, setOsmPlaces] = useState<Place[]>([]);
+    const [isFetchingMap, setIsFetchingMap] = useState(false);
+    const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
+    const [isSearchingCity, setIsSearchingCity] = useState(false);
 
-        <div className="flex-1 max-w-md mx-8 hidden md:block">
-            <div className="relative flex items-center w-full h-12 rounded-full bg-zinc-100 hover:bg-zinc-200/80 focus-within:bg-white focus-within:ring-2 focus-within:ring-rose-400/50 focus-within:shadow-md transition-all duration-300">
-                <Search className="absolute left-4 text-zinc-400" size={20} />
-                <input 
-                    type="text" 
-                    placeholder="Search cafes or restaurants..." 
-                    className="w-full h-full bg-transparent pl-12 pr-4 outline-none text-zinc-700 placeholder:text-zinc-400 font-medium"
+    // Initial mobile detection
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        handleResize();
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    // Combine local mock data with live OSM data
+    // OSM places that match a mock place by name (roughly) are ignored so mock data takes precedence
+    const combinedPlaces = [...mockPlaces, ...osmPlaces.filter(op => !mockPlaces.some(mp => mp.name.toLowerCase() === op.name.toLowerCase()))];
+    
+    // Filter by search
+    const filteredPlaces = combinedPlaces.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const selectedPlace = combinedPlaces.find(p => p.id === selectedId);
+
+    // Actions
+    const handleSelect = (id: number) => {
+        setSelectedId(id);
+        setFlyToLocation(null); // Clear flyTo when selecting a specific place so MapController handles centering
+        if (isMobile && !isMobilePanelOpen) {
+            setIsMobilePanelOpen(true);
+        }
+    };
+
+    const handleClearSelection = () => {
+        setSelectedId(null);
+    };
+
+    const toggleMobilePanel = (forceState: boolean | null = null) => {
+        setIsMobilePanelOpen(forceState !== null ? forceState : !isMobilePanelOpen);
+    };
+
+    const handleCopy = async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            showToast(`Copied: ${text}`);
+        } catch (err) {
+            console.error('Failed to copy', err);
+        }
+    };
+
+    const showToast = (message: string) => {
+        setToastMessage(message);
+        setTimeout(() => setToastMessage(null), 2500);
+    };
+
+    const handleLocateMe = () => {
+        if (!navigator.geolocation) {
+            showToast("Geolocation is not supported by your browser");
+            return;
+        }
+
+        setIsLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const newLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                setUserLocation(newLocation);
+                setFlyToLocation(newLocation);
+                setIsLocating(false);
+                setSelectedId(null); 
+                showToast("Location updated");
+            },
+            () => {
+                setIsLocating(false);
+                showToast("Unable to retrieve your location");
+            }
+        );
+    };
+
+    // Global city/area search using Nominatim (OpenStreetMap's geocoder)
+    const handleGlobalSearch = async (e: React.KeyboardEvent<HTMLInputElement> | React.ChangeEvent<HTMLInputElement>) => {
+        // Just standard search filtering if it's a typing event
+        if ('target' in e && !('key' in e)) {
+             setSearchQuery((e.target as HTMLInputElement).value);
+             return;
+        }
+
+        // Only do full geocoding search on enter press
+        if ('key' in e && e.key === 'Enter' && searchQuery.trim() !== '') {
+            setIsSearchingCity(true);
+            try {
+                // Search for city/country
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`);
+                const data = await res.json();
+                if (data && data.length > 0) {
+                    const lat = parseFloat(data[0].lat);
+                    const lon = parseFloat(data[0].lon);
+                    
+                    setFlyToLocation({ lat, lng: lon });
+                    setSelectedId(null);
+                    showToast(`Moved to ${data[0].display_name.split(',')[0]}`);
+                    
+                    if (isMobile) {
+                         setIsMobilePanelOpen(false);
+                    }
+                } else {
+                    showToast("Location not found");
+                }
+            } catch (error) {
+                console.error(error);
+                showToast("Search failed");
+            } finally {
+                setIsSearchingCity(false);
+            }
+        }
+    };
+
+    return (
+        <div className="flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-gray-50 text-gray-800 font-sans selection:bg-amber-200 relative">
+            
+            {/* Toast Notification */}
+            <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-[2000] flex items-center gap-2 transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 pointer-events-none translate-y-2'}`}>
+                <ShieldCheck size={18} className="text-green-400" />
+                <span className="text-sm font-medium">{toastMessage}</span>
+            </div>
+
+            {/* Loading Map Indicator */}
+            {isFetchingMap && !selectedId && (
+                <div className="fixed top-20 right-4 md:top-4 md:right-4 bg-white/90 backdrop-blur-sm shadow-md rounded-full px-4 py-2 flex items-center gap-2 z-[1000] animate-pulse border border-gray-100">
+                    <Loader2 size={16} className="text-amber-500 animate-spin" />
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">Scanning Area</span>
+                </div>
+            )}
+
+            {/* Sidebar / Details Panel */}
+            <div 
+                className={`absolute bottom-0 left-0 w-full h-[60vh] md:h-full md:w-96 md:relative bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-xl z-[1000] flex flex-col transform transition-transform duration-300 ease-in-out rounded-t-3xl md:rounded-none ${isMobile && !isMobilePanelOpen && !selectedId ? 'translate-y-full' : 'translate-y-0'}`}
+            >
+                {/* Mobile drag handle */}
+                <div className="w-full flex justify-center py-3 md:hidden cursor-pointer" onClick={() => toggleMobilePanel()}>
+                    <div className="w-12 h-1.5 bg-gray-300 rounded-full"></div>
+                </div>
+
+                {/* Header */}
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
+                    <div className="flex items-center gap-2">
+                        <div className="bg-amber-100 text-amber-700 p-2 rounded-lg">
+                            <MapPin size={20} className="stroke-[2.5]" />
+                        </div>
+                        <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                            kaf&apos;<span className="text-amber-600">map</span>
+                        </h1>
+                    </div>
+                    {isMobile && (
+                        <button className="text-gray-400 hover:text-gray-600" onClick={() => {setIsMobilePanelOpen(false); setSelectedId(null);}}>
+                            <X size={20} />
+                        </button>
+                    )}
+                </div>
+
+                {/* Dynamic Content Area */}
+                <div className="flex-1 overflow-y-auto relative w-full h-full bg-white">
+                    {selectedPlace ? (
+                        // --- DETAILS VIEW ---
+                        <div className="animate-fade-in relative pb-8">
+                            {/* Header Image area (gradient placeholder) */}
+                            <div className={`h-32 bg-gradient-to-r relative ${selectedPlace.type === 'cafe' ? 'from-amber-400 to-orange-500' : 'from-orange-500 to-red-500'}`}>
+                                <button onClick={handleClearSelection} className="absolute top-4 left-4 bg-white/20 hover:bg-white/40 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors">
+                                    <ArrowLeft size={16} />
+                                </button>
+                                {/* Tag if it's live data without details */}
+                                {!selectedPlace.toiletPass && selectedPlace.menu.length === 0 && (
+                                     <div className="absolute top-4 right-4 bg-black/30 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/20">
+                                         Unclaimed
+                                     </div>
+                                )}
+                            </div>
+                            
+                            <div className="px-6 pb-6 relative -mt-6">
+                                {/* Floating Icon */}
+                                <div className="w-14 h-14 bg-white rounded-full p-1 shadow-lg flex items-center justify-center mb-3">
+                                    <div className={`w-full h-full rounded-full flex items-center justify-center ${selectedPlace.type === 'cafe' ? 'bg-amber-100 text-amber-600' : 'bg-orange-100 text-orange-600'}`}>
+                                        {selectedPlace.type === 'cafe' ? <Coffee size={24} /> : <Utensils size={24} />}
+                                    </div>
+                                </div>
+
+                                <h2 className="text-2xl font-bold text-gray-900 leading-tight pr-2">{selectedPlace.name}</h2>
+                                <p className="text-sm text-gray-500 mt-1 flex items-center gap-1.5 line-clamp-2"><MapPin size={14} className="shrink-0"/> {selectedPlace.address}</p>
+
+                                {/* Passwords Grid */}
+                                <div className="grid grid-cols-2 gap-3 mt-6">
+                                    {/* Toilet Code */}
+                                    <div className="bg-blue-50 rounded-xl p-4 relative overflow-hidden group">
+                                        <div className="absolute -right-4 -top-4 text-blue-100 opacity-50 transform group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+                                            <KeyRound size={80} />
+                                        </div>
+                                        <div className="relative z-10">
+                                            <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-1">Toilet Code</p>
+                                            <div className="flex items-center justify-between h-8">
+                                                {selectedPlace.toiletPass ? (
+                                                    <p className="text-lg font-mono font-bold text-gray-900 tracking-tight">{selectedPlace.toiletPass}</p>
+                                                ) : (
+                                                    <p className="text-sm font-semibold text-gray-400 italic">N/A</p>
+                                                )}
+                                                {selectedPlace.toiletPass && selectedPlace.toiletPass !== 'Ask to staff' && (
+                                                    <button onClick={() => handleCopy(selectedPlace.toiletPass!)} className="text-blue-500 hover:text-blue-700 bg-white rounded-md p-1.5 shadow-sm transition-colors" title="Copy">
+                                                        <Copy size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* WiFi */}
+                                    <div className="bg-green-50 rounded-xl p-4 relative overflow-hidden group">
+                                        <div className="absolute -right-4 -top-4 text-green-100 opacity-50 transform group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+                                            <Wifi size={80} />
+                                        </div>
+                                        <div className="relative z-10">
+                                            <p className="text-xs font-bold text-green-600 uppercase tracking-wide mb-1">Free WiFi</p>
+                                            <div className="flex items-center justify-between h-8">
+                                                {selectedPlace.wifiPass ? (
+                                                    <p className="text-sm font-mono font-bold text-gray-900 truncate pr-2">{selectedPlace.wifiPass}</p>
+                                                ) : (
+                                                    <p className="text-sm font-semibold text-gray-400 italic">No WiFi</p>
+                                                )}
+                                                {selectedPlace.wifiPass && (
+                                                    <button onClick={() => handleCopy(selectedPlace.wifiPass!)} className="text-green-600 hover:text-green-800 bg-white rounded-md p-1.5 shadow-sm transition-colors" title="Copy">
+                                                        <Copy size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Menu Section (Snippet) */}
+                                <div className="mt-8">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Menu Snippet</h3>
+                                        <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded-md">Last updated today</span>
+                                    </div>
+                                    <div className={`bg-white border rounded-xl shadow-sm ${selectedPlace.menu.length > 0 ? 'border-gray-100 p-4' : 'border-dashed border-gray-300 bg-gray-50/50 p-6 flex flex-col items-center justify-center text-center'}`}>
+                                        {selectedPlace.menu.length > 0 ? (
+                                            <div className="space-y-0">
+                                                {selectedPlace.menu.slice(0, 3).map((item, idx) => (
+                                                    <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0">
+                                                        <span className="text-gray-700">{item.item}</span>
+                                                        <span className="font-semibold text-gray-900">{item.price}</span>
+                                                    </div>
+                                                ))}
+                                                {selectedPlace.menu.length > 3 && (
+                                                    <div className="pt-3 text-center border-t border-gray-50 mt-2">
+                                                        <button onClick={() => setIsMenuFullscreen(true)} className="text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center justify-center gap-1 w-full">
+                                                            <Maximize2 size={12} /> See all {selectedPlace.menu.length} items
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-gray-500">No menu prices submitted yet.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Action Button */}
+                                <button className="w-full mt-6 bg-gray-900 hover:bg-gray-800 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+                                    Update Info
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        // --- LIST VIEW ---
+                        <div className="p-6">
+                            <div className="relative mb-6">
+                                <input 
+                                    type="text" 
+                                    id="search-input" 
+                                    placeholder="Search cafes or restaurants..." 
+                                    className="w-full bg-gray-100 border-none rounded-xl py-3 pl-10 pr-10 focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all outline-none"
+                                    value={searchQuery} 
+                                    onChange={handleGlobalSearch}
+                                    onKeyDown={handleGlobalSearch}
+                                />
+                                <Search className="absolute left-4 top-3.5 text-gray-400" size={18} />
+                                {isSearchingCity && <Loader2 className="absolute right-4 top-3.5 text-amber-500 animate-spin" size={18} />}
+                            </div>
+                            
+                            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center justify-between">
+                                Nearby Places
+                            </h2>
+                            
+                            <div className="space-y-3 pb-8">
+                                {filteredPlaces.length === 0 && !isFetchingMap && (
+                                    <div className="text-center text-gray-500 py-8">
+                                        <MapIcon size={24} className="mx-auto mb-2 text-gray-400" />
+                                        No places found.
+                                    </div>
+                                )}
+
+                                {filteredPlaces.map(place => {
+                                    const isCafe = place.type === 'cafe';
+                                    const hasData = place.toiletPass || place.menu.length > 0;
+
+                                    return (
+                                    <div key={place.id} onClick={() => handleSelect(place.id)} className={`group cursor-pointer bg-white border border-gray-100 rounded-xl p-4 transition-all flex items-start gap-4 hover:shadow-md hover:border-amber-200`}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isCafe ? 'bg-amber-100 text-amber-600' : 'bg-orange-100 text-orange-600'}`}>
+                                            {isCafe ? <Coffee size={18} /> : <Utensils size={18} />}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-semibold text-gray-900 truncate group-hover:text-amber-700 transition-colors pr-2">{place.name}</h3>
+                                            <p className="text-xs text-gray-500 truncate mt-0.5">{place.address}</p>
+                                            
+                                            <div className="flex gap-3 mt-2 flex-wrap">
+                                                {place.rating > 0 && <span className="text-xs font-medium text-gray-500 flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400"/> {place.rating}</span>}
+                                                {place.toiletPass && <span className="text-xs font-medium text-blue-500 flex items-center gap-1"><KeyRound size={12}/> Code</span>}
+                                                {place.menu.length > 0 && <span className="text-xs font-medium text-green-600 flex items-center gap-1"><Utensils size={12}/> Menu</span>}
+                                                {!hasData && <span className="text-xs font-medium text-gray-400 flex items-center gap-1 uppercase tracking-wider text-[10px]">Unclaimed</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )})}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Map Area */}
+            <div className="flex-1 w-full h-full z-0 relative bg-gray-100">
+                <MapComponent 
+                    places={filteredPlaces} 
+                    onSelect={handleSelect} 
+                    selectedId={selectedId} 
+                    isMobile={isMobile} 
+                    userLocation={userLocation} 
+                    flyToLocation={flyToLocation}
+                    onOsmPlacesFetch={setOsmPlaces}
+                    setIsFetchingMap={setIsFetchingMap}
                 />
+                
+                {/* Floating Map Controls */}
+                <div className="absolute bottom-6 right-6 z-[500] flex flex-col gap-3">
+                    <button 
+                        onClick={handleLocateMe}
+                        className={`w-12 h-12 bg-white text-gray-700 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100 ${isLocating ? 'animate-pulse text-blue-500' : ''}`}
+                        title="Locate Me"
+                    >
+                        {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
+                    </button>
+                </div>
+
+                {/* Mobile Open Panel Button (Visible when panel is closed on mobile) */}
+                {isMobile && !isMobilePanelOpen && !selectedId && (
+                    <button onClick={() => toggleMobilePanel()} className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[500] bg-white text-gray-800 px-6 py-3 rounded-full shadow-lg font-medium border border-gray-100 flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
+                        <List size={18} className="text-amber-600" /> <span className="text-sm">Browse Places</span>
+                    </button>
+                )}
             </div>
-        </div>
 
-        <div className="flex items-center gap-4">
-            <button className="hidden md:flex items-center gap-2 px-4 py-2 text-sm font-semibold text-zinc-600 hover:text-zinc-900 transition-colors">
-                <Compass size={18} />
-                Explore
-            </button>
-            <button className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-zinc-900 hover:bg-zinc-800 rounded-full shadow-md hover:shadow-lg transition-all active:scale-95">
-                <LogIn size={18} />
-                Sign In
-            </button>
-        </div>
-      </header>
+            {/* FULLSCREEN MENU MODAL */}
+            {isMenuFullscreen && selectedPlace && (
+                <div className="fixed inset-0 z-[3000] bg-white flex flex-col animate-fade-in overflow-hidden">
+                    {/* Modal Header */}
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${selectedPlace.type === 'cafe' ? 'bg-amber-100 text-amber-600' : 'bg-orange-100 text-orange-600'}`}>
+                                {selectedPlace.type === 'cafe' ? <Coffee size={20} /> : <Utensils size={20} />}
+                            </div>
+                            <div className="min-w-0">
+                                <h2 className="text-lg font-bold text-gray-900 leading-tight truncate">{selectedPlace.name}</h2>
+                                <p className="text-xs text-gray-500 font-medium">Full Menu</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={() => setIsMenuFullscreen(false)}
+                            className="text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+                        >
+                            <X size={24} />
+                        </button>
+                    </div>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col md:flex-row h-[calc(100vh-73px)] overflow-hidden bg-zinc-50 relative">
-        
-        {/* Sidebar overlay for mobile (optional in full version, hidden for demo) */}
-        
-        {/* Map Container */}
-        <div className="relative flex-1 h-full w-full z-0 p-2 md:p-4">
-            <div className="h-full w-full rounded-2xl overflow-hidden border border-zinc-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-black/5">
-                 <MapComponent />
-            </div>
+                    {/* Modal Content (Scrollable List) */}
+                    <div className="flex-1 overflow-y-auto p-6">
+                        <div className="max-w-2xl mx-auto">
+                            <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden divide-y divide-gray-50">
+                                {selectedPlace.menu.map((item, idx) => (
+                                    <div key={idx} className="flex justify-between items-center p-4">
+                                        <div className="flex-1 pr-4">
+                                            <h4 className="text-base text-gray-800 font-medium">{item.item}</h4>
+                                        </div>
+                                        <div className="shrink-0 flex items-center">
+                                            <span className="text-base font-semibold text-gray-900">{item.price}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="text-center mt-6 mb-8 flex flex-col items-center gap-2">
+                                <ShieldCheck size={20} className="text-gray-300" />
+                                <p className="text-xs text-gray-400">Prices are user-submitted and may not be 100% accurate or up-to-date.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-
-        {/* Floating action button for quick add */}
-        <button className="absolute bottom-8 right-8 z-50 flex items-center justify-center w-14 h-14 bg-rose-500 hover:bg-rose-600 text-white rounded-full shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 group">
-             <MapPin size={24} className="group-hover:scale-110 transition-transform" />
-        </button>
-      </main>
-    </div>
-  );
+    );
 }

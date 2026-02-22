@@ -208,7 +208,7 @@ export default function MapComponent({
 
 
   if (!L) return (
-      <div className={`absolute inset-0 animate-pulse flex items-center justify-center ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-100'}`}>
+      <div className={`absolute inset-0 animate-pulse flex items-center justify-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
           <p className={`font-medium ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>Initializing Map...</p>
       </div>
   );
@@ -253,7 +253,7 @@ export default function MapComponent({
             zoom={15}
             zoomControl={false}
             scrollWheelZoom={true}
-            style={{ height: "100%", width: "100%", zIndex: 0, background: theme === 'dark' ? '#1f2937' : '#f3f4f6' }}
+            style={{ height: "100%", width: "100%", zIndex: 0, background: theme === 'dark' ? '#111827' : '#f3f4f6' }}
         >
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors'
@@ -262,7 +262,6 @@ export default function MapComponent({
                     : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"}
                 subdomains="abcd"
                 maxZoom={20}
-                className={theme === 'dark' ? 'map-tiles-dark' : ''}
             />
             
             <MapEventsWrapper onZoomEnd={onZoomEnd} onMoveEnd={onMoveEnd} setMapRef={setMap} />

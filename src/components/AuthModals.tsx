@@ -1,7 +1,36 @@
-import { X, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, updateProfile } from "firebase/auth";
+import { auth } from "../lib/firebase";
 
 export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: boolean, onClose: () => void, onSwitchToRegister: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
   if (!isOpen) return null;
+
+  const handleLogin = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError(null);
+      try {
+          await signInWithEmailAndPassword(auth, email, password);
+          onClose();
+      } catch (err: any) {
+          setError(err.message || "Failed to login");
+      }
+  };
+
+  const handleGoogleLogin = async () => {
+      setError(null);
+      try {
+          const provider = new GoogleAuthProvider();
+          await signInWithPopup(auth, provider);
+          onClose();
+      } catch (err: any) {
+          setError(err.message || "Failed to login with Google");
+      }
+  };
 
   return (
     <div className="fixed inset-0 z-[3000] flex flex-col items-center justify-center p-4 animate-fade-in bg-white dark:bg-gray-800">
@@ -23,7 +52,8 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
             <div className="bg-white dark:bg-gray-800 py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-100 dark:border-gray-700">
-            <form className="space-y-6" action="#" method="POST" onSubmit={(e) => e.preventDefault()}>
+            <form className="space-y-6" onSubmit={handleLogin}>
+                {error && <div className="text-red-500 text-sm text-center">{error}</div>}
                 <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Email address
@@ -35,6 +65,8 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
                     type="email"
                     autoComplete="email"
                     required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm dark:bg-gray-700 dark:text-white"
                     />
                 </div>
@@ -51,6 +83,8 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
                     type="password"
                     autoComplete="current-password"
                     required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm dark:bg-gray-700 dark:text-white"
                     />
                 </div>
@@ -99,6 +133,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
                 <div className="mt-6">
                     <button
                     type="button"
+                    onClick={handleGoogleLogin}
                     className="w-full inline-flex justify-center items-center py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                     >
                     <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" aria-hidden="true">
@@ -140,7 +175,37 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
 }
 
 export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: boolean, onClose: () => void, onSwitchToLogin: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
   if (!isOpen) return null;
+
+  const handleRegister = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setError(null);
+      try {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          if (name) {
+              await updateProfile(userCredential.user, { displayName: name });
+          }
+          onClose();
+      } catch (err: any) {
+          setError(err.message || "Failed to register");
+      }
+  };
+
+  const handleGoogleLogin = async () => {
+      setError(null);
+      try {
+          const provider = new GoogleAuthProvider();
+          await signInWithPopup(auth, provider);
+          onClose();
+      } catch (err: any) {
+          setError(err.message || "Failed to register with Google");
+      }
+  };
 
   return (
     <div className="fixed inset-0 z-[3000] flex flex-col items-center justify-center p-4 animate-fade-in bg-white dark:bg-gray-800">
@@ -162,7 +227,8 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
 
         <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
             <div className="bg-white dark:bg-gray-800 py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-100 dark:border-gray-700">
-            <form className="space-y-6" action="#" method="POST" onSubmit={(e) => e.preventDefault()}>
+            <form className="space-y-6" onSubmit={handleRegister}>
+                {error && <div className="text-red-500 text-sm text-center">{error}</div>}
                 <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                     Full Name
@@ -174,6 +240,8 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
                     type="text"
                     autoComplete="name"
                     required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm dark:bg-gray-700 dark:text-white"
                     />
                 </div>
@@ -190,6 +258,8 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
                     type="email"
                     autoComplete="email"
                     required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm dark:bg-gray-700 dark:text-white"
                     />
                 </div>
@@ -206,6 +276,8 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
                     type="password"
                     autoComplete="new-password"
                     required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                     className="appearance-none block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm dark:bg-gray-700 dark:text-white"
                     />
                 </div>
@@ -234,6 +306,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
                 <div className="mt-6">
                     <button
                     type="button"
+                    onClick={handleGoogleLogin}
                     className="w-full inline-flex justify-center items-center py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-sm font-medium text-gray-500 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
                     >
                     <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24" aria-hidden="true">

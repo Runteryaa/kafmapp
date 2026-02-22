@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
+import { onAuthStateChanged, signOut, User } from "firebase/auth";
+import { auth } from "../lib/firebase";
 
 // Dynamically import the Map component with ssr: false
 const MapComponent = dynamic(() => import("../components/Map"), {
@@ -48,6 +50,15 @@ export default function Home() {
     const [isThemeLoaded, setIsThemeLoaded] = useState(false);
     const [isLoginOpen, setIsLoginOpen] = useState(false);
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+    const [user, setUser] = useState<User | null>(null);
+
+    // Listen for auth state changes
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+            setUser(currentUser);
+        });
+        return () => unsubscribe();
+    }, []);
 
     // Load theme from local storage
     useEffect(() => {
@@ -173,6 +184,17 @@ export default function Home() {
         if (mapInstance) mapInstance.zoomOut();
     };
 
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            setIsBurgerMenuOpen(false);
+            showToast("Logged out successfully");
+        } catch (error) {
+            console.error("Error signing out:", error);
+            showToast("Failed to log out");
+        }
+    };
+
     // Global city/area search using Nominatim (OpenStreetMap's geocoder)
     const handleGlobalSearch = async (e: React.KeyboardEvent<HTMLInputElement> | React.ChangeEvent<HTMLInputElement>) => {
         // Just standard search filtering if it's a typing event
@@ -231,24 +253,35 @@ export default function Home() {
                     />
                     <div className="fixed top-16 right-4 z-[2000] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 w-48 overflow-hidden animate-fade-in origin-top-right">
                         <div className="flex flex-col py-1">
-                            <button
-                                onClick={() => {
-                                    setIsLoginOpen(true);
-                                    setIsBurgerMenuOpen(false);
-                                }}
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
-                            >
-                                <LogIn size={18} className="text-gray-400" /> Login
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setIsRegisterOpen(true);
-                                    setIsBurgerMenuOpen(false);
-                                }}
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
-                            >
-                                <UserPlus size={18} className="text-gray-400" /> Register
-                            </button>
+                            {user ? (
+                                <button
+                                    onClick={handleLogout}
+                                    className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-red-600 dark:text-red-400 transition-colors w-full text-left"
+                                >
+                                    <LogIn size={18} className="text-red-400 transform rotate-180" /> Logout
+                                </button>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            setIsLoginOpen(true);
+                                            setIsBurgerMenuOpen(false);
+                                        }}
+                                        className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
+                                    >
+                                        <LogIn size={18} className="text-gray-400" /> Login
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsRegisterOpen(true);
+                                            setIsBurgerMenuOpen(false);
+                                        }}
+                                        className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
+                                    >
+                                        <UserPlus size={18} className="text-gray-400" /> Register
+                                    </button>
+                                </>
+                            )}
                             <div className="h-px bg-gray-100 dark:bg-gray-700 my-1" />
                             <button
                                 onClick={() => {

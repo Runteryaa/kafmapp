@@ -31,7 +31,7 @@
 
   /* Brightness filter for dark mode map tiles */
   .map-tiles-dark {
-    filter: brightness(1.2) contrast(0.9);
+    filter: brightness(2) contrast(0.7);
   }
 }
 

@@ -4,7 +4,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[3000] flex flex-col items-center justify-center p-4 animate-fade-in bg-white dark:bg-gray-900">
+    <div className="fixed inset-0 z-[3000] flex flex-col items-center justify-center p-4 animate-fade-in bg-white dark:bg-gray-800">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-6 relative">
              <button
@@ -143,7 +143,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[3000] flex flex-col items-center justify-center p-4 animate-fade-in bg-white dark:bg-gray-900">
+    <div className="fixed inset-0 z-[3000] flex flex-col items-center justify-center p-4 animate-fade-in bg-white dark:bg-gray-800">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-6 relative">
              <button

@@ -342,7 +342,7 @@ export default function Home() {
                                 </div>
                             </div>
                         </div>
-                        <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex justify-end">
+                        <div className="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex justify-end">
                             <button
                                 onClick={() => setIsSettingsOpen(false)}
                                 className="bg-gray-900 dark:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors shadow-sm"
@@ -370,7 +370,7 @@ export default function Home() {
 
             {/* Sidebar / Details Panel */}
             <div 
-                className={`absolute bottom-0 left-0 w-full h-[60vh] md:h-full md:w-96 md:relative bg-white dark:bg-gray-900 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-xl z-[1000] flex flex-col transform transition-transform duration-300 ease-in-out rounded-t-3xl md:rounded-none ${isMobile && !isMobilePanelOpen && !selectedId ? 'translate-y-full' : 'translate-y-0'}`}
+                className={`absolute bottom-0 left-0 w-full h-[60vh] md:h-full md:w-96 md:relative bg-white dark:bg-gray-800 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-xl z-[1000] flex flex-col transform transition-transform duration-300 ease-in-out rounded-t-3xl md:rounded-none ${isMobile && !isMobilePanelOpen && !selectedId ? 'translate-y-full' : 'translate-y-0'}`}
             >
                 {/* Mobile drag handle */}
                 <div className="w-full flex justify-center py-3 md:hidden cursor-pointer" onClick={() => toggleMobilePanel()}>
@@ -627,7 +627,7 @@ export default function Home() {
 
             {/* FULLSCREEN MENU MODAL */}
             {isMenuFullscreen && selectedPlace && (
-                <div className="fixed inset-0 z-[3000] bg-white dark:bg-gray-900 flex flex-col animate-fade-in overflow-hidden">
+                <div className="fixed inset-0 z-[3000] bg-white dark:bg-gray-800 flex flex-col animate-fade-in overflow-hidden">
                     {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
                         <div className="flex items-center gap-3">
@@ -648,7 +648,7 @@ export default function Home() {
                     </div>
 
                     {/* Modal Content (Scrollable List) */}
-                    <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-gray-900">
+                    <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-gray-800">
                         <div className="max-w-2xl mx-auto">
                             <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden divide-y divide-gray-50 dark:divide-gray-700">
                                 {selectedPlace.menu.map((item, idx) => (

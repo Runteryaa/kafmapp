@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { 
     MapPin, Search, Coffee, Utensils, 
-    Star, ArrowLeft, KeyRound, Wifi, Copy, List, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation
+    Star, ArrowLeft, KeyRound, Wifi, Copy, List, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 
@@ -34,6 +36,14 @@ export default function Home() {
     const [isFetchingMap, setIsFetchingMap] = useState(false);
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
+
+    // New state for features
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [mapInstance, setMapInstance] = useState<any>(null);
+    const [isBurgerMenuOpen, setIsBurgerMenuOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [language, setLanguage] = useState<'en' | 'es'>('en');
 
     // Initial mobile detection
     useEffect(() => {
@@ -108,6 +118,14 @@ export default function Home() {
         );
     };
 
+    const handleZoomIn = () => {
+        if (mapInstance) mapInstance.zoomIn();
+    };
+
+    const handleZoomOut = () => {
+        if (mapInstance) mapInstance.zoomOut();
+    };
+
     // Global city/area search using Nominatim (OpenStreetMap's geocoder)
     const handleGlobalSearch = async (e: React.KeyboardEvent<HTMLInputElement> | React.ChangeEvent<HTMLInputElement>) => {
         // Just standard search filtering if it's a typing event
@@ -147,8 +165,124 @@ export default function Home() {
     };
 
     return (
-        <div className="flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-gray-50 text-gray-800 font-sans selection:bg-amber-200 relative">
+        <div className={`flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-gray-50 text-gray-800 font-sans selection:bg-amber-200 relative ${theme === 'dark' ? 'dark' : ''}`}>
             
+            {/* Burger Menu Button */}
+            <button
+                onClick={() => setIsBurgerMenuOpen(!isBurgerMenuOpen)}
+                className="fixed top-4 right-4 z-[2000] bg-white p-2 rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+            >
+                <Menu size={24} className="text-gray-700" />
+            </button>
+
+            {/* Burger Menu Popup */}
+            {isBurgerMenuOpen && (
+                <>
+                    <div
+                        className="fixed inset-0 bg-black/20 z-[1999]"
+                        onClick={() => setIsBurgerMenuOpen(false)}
+                    />
+                    <div className="fixed top-16 right-4 z-[2000] bg-white rounded-xl shadow-xl border border-gray-100 w-48 overflow-hidden animate-fade-in origin-top-right">
+                        <div className="flex flex-col py-1">
+                            <Link
+                                href="/login"
+                                className="px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-sm font-medium text-gray-700 transition-colors"
+                            >
+                                <LogIn size={18} className="text-gray-400" /> Login
+                            </Link>
+                            <Link
+                                href="/register"
+                                className="px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-sm font-medium text-gray-700 transition-colors"
+                            >
+                                <UserPlus size={18} className="text-gray-400" /> Register
+                            </Link>
+                            <div className="h-px bg-gray-100 my-1" />
+                            <button
+                                onClick={() => {
+                                    setIsSettingsOpen(true);
+                                    setIsBurgerMenuOpen(false);
+                                }}
+                                className="px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-sm font-medium text-gray-700 transition-colors w-full text-left"
+                            >
+                                <Settings size={18} className="text-gray-400" /> Settings
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Settings Modal */}
+            {isSettingsOpen && (
+                <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+                    <div
+                        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+                        onClick={() => setIsSettingsOpen(false)}
+                    />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in">
+                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                            <h3 className="font-bold text-lg text-gray-900">Settings</h3>
+                            <button
+                                onClick={() => setIsSettingsOpen(false)}
+                                className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            {/* Theme Setting */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                    <Sun size={16} /> Appearance
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setTheme('light')}
+                                        className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-sm font-medium transition-all ${theme === 'light' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                                    >
+                                        <Sun size={16} /> Light
+                                    </button>
+                                    <button
+                                        onClick={() => setTheme('dark')}
+                                        className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-sm font-medium transition-all ${theme === 'dark' ? 'bg-gray-800 border-gray-700 text-white ring-1 ring-gray-700' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                                    >
+                                        <Moon size={16} /> Dark
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Language Setting */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                                    <Languages size={16} /> Language
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => setLanguage('en')}
+                                        className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'en' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                                    >
+                                        English
+                                    </button>
+                                    <button
+                                        onClick={() => setLanguage('es')}
+                                        className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'es' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                                    >
+                                        Español
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="bg-gray-50 px-6 py-4 flex justify-end">
+                            <button
+                                onClick={() => setIsSettingsOpen(false)}
+                                className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Toast Notification */}
             <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-[2000] flex items-center gap-2 transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 pointer-events-none translate-y-2'}`}>
                 <ShieldCheck size={18} className="text-green-400" />
@@ -368,10 +502,11 @@ export default function Home() {
                     flyToLocation={flyToLocation}
                     onOsmPlacesFetch={setOsmPlaces}
                     setIsFetchingMap={setIsFetchingMap}
+                    onMapReady={setMapInstance}
                 />
                 
                 {/* Floating Map Controls */}
-                <div className="absolute bottom-6 right-6 z-[500] flex flex-col gap-3">
+                <div className="absolute bottom-6 left-6 z-[500] flex flex-col gap-3">
                     <button 
                         onClick={handleLocateMe}
                         className={`w-12 h-12 bg-white text-gray-700 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100 ${isLocating ? 'animate-pulse text-blue-500' : ''}`}
@@ -379,13 +514,38 @@ export default function Home() {
                     >
                         {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
                     </button>
+                    <button
+                        onClick={handleZoomIn}
+                        className="w-12 h-12 bg-white text-gray-700 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100"
+                        title="Zoom In"
+                    >
+                        <Plus size={20} />
+                    </button>
+                    <button
+                        onClick={handleZoomOut}
+                        className="w-12 h-12 bg-white text-gray-700 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100"
+                        title="Zoom Out"
+                    >
+                        <Minus size={20} />
+                    </button>
                 </div>
 
                 {/* Mobile Open Panel Button (Visible when panel is closed on mobile) */}
                 {isMobile && !isMobilePanelOpen && !selectedId && (
-                    <button onClick={() => toggleMobilePanel()} className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[500] bg-white text-gray-800 px-6 py-3 rounded-full shadow-lg font-medium border border-gray-100 flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
-                        <List size={18} className="text-amber-600" /> <span className="text-sm">Browse Places</span>
-                    </button>
+                    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[500] w-[90%] max-w-sm">
+                        <button
+                            onClick={() => {
+                                toggleMobilePanel(true);
+                                setTimeout(() => {
+                                    document.getElementById('search-input')?.focus();
+                                }, 100);
+                            }}
+                            className="w-full bg-white text-gray-500 px-4 py-3 rounded-xl shadow-lg font-medium border border-gray-100 flex items-center gap-3 hover:bg-gray-50 transition-all text-left"
+                        >
+                            <Search size={20} className="text-gray-400" />
+                            <span className="text-sm">Search places...</span>
+                        </button>
+                    </div>
                 )}
             </div>
 

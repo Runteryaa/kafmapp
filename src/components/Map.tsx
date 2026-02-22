@@ -44,11 +44,13 @@ const MapEventsWrapper = dynamic(
 );
 
 export default function MapComponent({ 
-    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap
+    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap, onMapReady
 }: { 
     places: Place[], onSelect: (id: number) => void, selectedId: number | null, isMobile: boolean, 
     userLocation: LocationState | null, flyToLocation: LocationState | null,
-    onOsmPlacesFetch: (places: Place[]) => void, setIsFetchingMap: (b: boolean) => void
+    onOsmPlacesFetch: (places: Place[]) => void, setIsFetchingMap: (b: boolean) => void,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onMapReady?: (map: any) => void
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [L, setL] = useState<any>(null);
@@ -197,6 +199,7 @@ export default function MapComponent({
   useEffect(() => {
       if (map) {
          fetchPlaces();
+         if (onMapReady) onMapReady(map);
       }
       return () => { if (fetchRef.current) clearTimeout(fetchRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -67,6 +67,29 @@ export default function Home() {
         }
     }, [theme, isThemeLoaded]);
 
+    // Auto-locate user on initial load
+    useEffect(() => {
+        if (!navigator.geolocation) return;
+
+        setIsLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const newLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                setUserLocation(newLocation);
+                setFlyToLocation(newLocation);
+                setIsLocating(false);
+            },
+            (error) => {
+                console.warn("Auto-location failed on load:", error);
+                setIsLocating(false);
+            }
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Initial mobile detection
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);

@@ -9,6 +9,7 @@ import {
     Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
+import { LoginModal, RegisterModal } from "../components/AuthModals";
 
 // Dynamically import the Map component with ssr: false
 const MapComponent = dynamic(() => import("../components/Map"), {
@@ -45,6 +46,8 @@ export default function Home() {
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     const [language, setLanguage] = useState<'en' | 'es'>('en');
     const [isThemeLoaded, setIsThemeLoaded] = useState(false);
+    const [isLoginOpen, setIsLoginOpen] = useState(false);
+    const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 
     // Load theme from local storage
     useEffect(() => {
@@ -205,18 +208,24 @@ export default function Home() {
                     />
                     <div className="fixed top-16 right-4 z-[2000] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 w-48 overflow-hidden animate-fade-in origin-top-right">
                         <div className="flex flex-col py-1">
-                            <Link
-                                href="/login"
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
+                            <button
+                                onClick={() => {
+                                    setIsLoginOpen(true);
+                                    setIsBurgerMenuOpen(false);
+                                }}
+                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                             >
                                 <LogIn size={18} className="text-gray-400" /> Login
-                            </Link>
-                            <Link
-                                href="/register"
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsRegisterOpen(true);
+                                    setIsBurgerMenuOpen(false);
+                                }}
+                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                             >
                                 <UserPlus size={18} className="text-gray-400" /> Register
-                            </Link>
+                            </button>
                             <div className="h-px bg-gray-100 dark:bg-gray-700 my-1" />
                             <button
                                 onClick={() => {
@@ -231,6 +240,24 @@ export default function Home() {
                     </div>
                 </>
             )}
+
+            {/* Auth Modals */}
+            <LoginModal
+                isOpen={isLoginOpen}
+                onClose={() => setIsLoginOpen(false)}
+                onSwitchToRegister={() => {
+                    setIsLoginOpen(false);
+                    setIsRegisterOpen(true);
+                }}
+            />
+            <RegisterModal
+                isOpen={isRegisterOpen}
+                onClose={() => setIsRegisterOpen(false)}
+                onSwitchToLogin={() => {
+                    setIsRegisterOpen(false);
+                    setIsLoginOpen(true);
+                }}
+            />
 
             {/* Settings Modal */}
             {isSettingsOpen && (

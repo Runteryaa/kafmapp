@@ -44,11 +44,14 @@ const MapEventsWrapper = dynamic(
 );
 
 export default function MapComponent({ 
-    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap
+    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap, onMapReady, theme
 }: { 
     places: Place[], onSelect: (id: number) => void, selectedId: number | null, isMobile: boolean, 
     userLocation: LocationState | null, flyToLocation: LocationState | null,
-    onOsmPlacesFetch: (places: Place[]) => void, setIsFetchingMap: (b: boolean) => void
+    onOsmPlacesFetch: (places: Place[]) => void, setIsFetchingMap: (b: boolean) => void,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onMapReady?: (map: any) => void,
+    theme?: 'light' | 'dark'
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [L, setL] = useState<any>(null);
@@ -197,13 +200,18 @@ export default function MapComponent({
   useEffect(() => {
       if (map) {
          fetchPlaces();
+         if (onMapReady) onMapReady(map);
       }
       return () => { if (fetchRef.current) clearTimeout(fetchRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
 
-  if (!L) return <div className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center"><p className="text-gray-400 font-medium">Initializing Map...</p></div>;
+  if (!L) return (
+      <div className={`absolute inset-0 animate-pulse flex items-center justify-center ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
+          <p className={`font-medium ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>Initializing Map...</p>
+      </div>
+  );
 
   const getCustomIcon = (type: string, isUnclaimed: boolean) => {
     const isCafe = type === 'cafe';
@@ -245,11 +253,13 @@ export default function MapComponent({
             zoom={15}
             zoomControl={false}
             scrollWheelZoom={true}
-            style={{ height: "100%", width: "100%", zIndex: 0 }}
+            style={{ height: "100%", width: "100%", zIndex: 0, background: theme === 'dark' ? '#111827' : '#f3f4f6' }}
         >
             <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors'
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                url={theme === 'dark'
+                    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                    : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"}
                 subdomains="abcd"
                 maxZoom={20}
             />

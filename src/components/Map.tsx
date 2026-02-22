@@ -61,7 +61,8 @@ export default function MapComponent({
   const [currentZoom, setCurrentZoom] = useState(15);
   
   const fetchRef = useRef<number | null>(null);
-  const [lastFetchBounds, setLastFetchBounds] = useState<string>("");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [loadedBounds, setLoadedBounds] = useState<any>(null);
 
   useEffect(() => {
       // Import leaflet on client side only
@@ -94,11 +95,17 @@ export default function MapComponent({
            return; 
       }
       
-      const bounds = map.getBounds();
-      const boundsStr = `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+      const currentBounds = map.getBounds();
+
+      // Optimization: Check if current view is fully inside the already loaded area
+      // If yes, we don't need to fetch again
+      if (loadedBounds && loadedBounds.contains(currentBounds)) {
+          return;
+      }
       
-      if (boundsStr === lastFetchBounds) return;
-      setLastFetchBounds(boundsStr);
+      // Load a bigger area (50% padding) to reduce future requests while panning
+      const expandedBounds = currentBounds.pad(0.5);
+      const boundsStr = `${expandedBounds.getSouth()},${expandedBounds.getWest()},${expandedBounds.getNorth()},${expandedBounds.getEast()}`;
 
       const query = `
           [out:json][timeout:10];
@@ -152,7 +159,6 @@ export default function MapComponent({
 
       if (!success || !data) {
           console.error("All Overpass endpoints failed or returned XML");
-          setLastFetchBounds(""); // Clear bounds to retry later
           return;
       }
 
@@ -178,9 +184,9 @@ export default function MapComponent({
               });
           
           onOsmPlacesFetch(newPlaces);
+          setLoadedBounds(expandedBounds);
       } catch (e) {
           console.error("Parsing Overpass data failed", e);
-          setLastFetchBounds(""); // Clear bounds to retry later
       }
   };
 

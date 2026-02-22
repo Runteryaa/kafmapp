@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { 
     MapPin, Search, Coffee, Utensils, Pizza, Beer,
-    Star, ArrowLeft, KeyRound, Wifi, Copy, List, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
+    Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
     Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
@@ -76,6 +75,12 @@ export default function Home() {
     const [isFetchingMap, setIsFetchingMap] = useState(false);
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
+
+    // Panel drag state
+    const [panelHeight, setPanelHeight] = useState(60); // vh
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStartY = useRef(0);
+    const dragStartHeight = useRef(0);
 
     // New state for features
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -210,6 +215,56 @@ export default function Home() {
 
     const handleZoomOut = () => {
         if (mapInstance) mapInstance.zoomOut();
+    };
+
+    // Panel Drag Handlers
+    const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+        if (!isMobile) return;
+
+        // Only trigger if we're touching the handle or header, not the content
+        // This is handled by where we attach the events
+
+        setIsDragging(true);
+        const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
+        dragStartY.current = clientY;
+        dragStartHeight.current = panelHeight;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+        if (!isDragging || !isMobile) return;
+
+        const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
+        const deltaY = dragStartY.current - clientY; // Positive = Drag Up
+        const windowHeight = window.innerHeight;
+
+        // Convert delta pixels to vh
+        const deltaVh = (deltaY / windowHeight) * 100;
+
+        // Calculate new height
+        let newHeight = dragStartHeight.current + deltaVh;
+
+        // Clamp values
+        if (newHeight > 100) newHeight = 100;
+        if (newHeight < 20) newHeight = 20;
+
+        setPanelHeight(newHeight);
+    };
+
+    const handleTouchEnd = () => {
+        if (!isDragging || !isMobile) return;
+        setIsDragging(false);
+
+        // Snap logic
+        if (panelHeight > 80) { // If dragged past 80%, snap to full
+            setPanelHeight(100);
+        } else if (panelHeight < 45) { // If dragged below 45%, close
+            setIsMobilePanelOpen(false);
+            setSelectedId(null);
+            // Reset height for next open after transition
+            setTimeout(() => setPanelHeight(60), 300);
+        } else { // Snap back to default
+            setPanelHeight(60);
+        }
     };
 
     // Global city/area search using Nominatim (OpenStreetMap's geocoder)
@@ -409,15 +464,37 @@ export default function Home() {
 
             {/* Sidebar / Details Panel */}
             <div 
-                className={`absolute bottom-0 left-0 w-full h-[60vh] md:h-full md:w-96 md:relative bg-white dark:bg-gray-900 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-xl z-[1000] flex flex-col transform transition-transform duration-300 ease-in-out rounded-t-3xl md:rounded-none ${isMobile && !isMobilePanelOpen && !selectedId ? 'translate-y-full' : 'translate-y-0'}`}
+                className={`absolute bottom-0 left-0 w-full md:h-full md:w-96 md:relative bg-white dark:bg-gray-900 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-xl z-[1000] flex flex-col transform transition-transform duration-300 ease-in-out rounded-t-3xl md:rounded-none ${isMobile && !isMobilePanelOpen && !selectedId ? 'translate-y-full' : 'translate-y-0'}`}
+                style={{
+                    height: isMobile ? `${panelHeight}vh` : '100%',
+                    transition: isDragging ? 'none' : undefined
+                }}
             >
                 {/* Mobile drag handle */}
-                <div className="w-full flex justify-center py-3 md:hidden cursor-pointer" onClick={() => toggleMobilePanel()}>
+                <div
+                    className="w-full flex justify-center py-3 md:hidden cursor-grab active:cursor-grabbing touch-none"
+                    onMouseDown={handleTouchStart}
+                    onMouseMove={handleTouchMove}
+                    onMouseUp={handleTouchEnd}
+                    onMouseLeave={handleTouchEnd}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                >
                     <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
                 </div>
 
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0 bg-white dark:bg-gray-800">
+                {/* Header - Also draggable */}
+                <div
+                    className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0 bg-white dark:bg-gray-800 touch-none"
+                    onMouseDown={handleTouchStart}
+                    onMouseMove={handleTouchMove}
+                    onMouseUp={handleTouchEnd}
+                    onMouseLeave={handleTouchEnd}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                >
                     <div className="flex items-center gap-2">
                         <div className="bg-amber-100 text-amber-700 p-2 rounded-lg">
                             <MapPin size={20} className="stroke-[2.5]" />

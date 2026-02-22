@@ -527,15 +527,8 @@ export default function Home() {
                     theme={theme}
                 />
                 
-                {/* Floating Map Controls */}
+                {/* Floating Map Controls - Zoom Buttons (Left) */}
                 <div className={`absolute left-6 z-[500] flex flex-col gap-3 transition-all duration-300 ${isMobileSearchVisible ? 'bottom-24' : 'bottom-6'}`}>
-                    <button 
-                        onClick={handleLocateMe}
-                        className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isLocating ? 'animate-pulse text-blue-500' : ''}`}
-                        title="Locate Me"
-                    >
-                        {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
-                    </button>
                     <button
                         onClick={handleZoomIn}
                         className="w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
@@ -549,6 +542,17 @@ export default function Home() {
                         title="Zoom Out"
                     >
                         <Minus size={20} />
+                    </button>
+                </div>
+
+                {/* Floating Map Controls - Locate Me Button (Right) */}
+                <div className={`absolute right-6 z-[500] flex flex-col gap-3 transition-all duration-300 ${isMobileSearchVisible ? 'bottom-24' : 'bottom-6'}`}>
+                    <button
+                        onClick={handleLocateMe}
+                        className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isLocating ? 'animate-pulse text-blue-500' : ''}`}
+                        title="Locate Me"
+                    >
+                        {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
                     </button>
                 </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 
 // We need to dynamically import react-leaflet components since Leaflet uses the window object
@@ -24,6 +24,9 @@ const Circle = dynamic(
   () => import('react-leaflet').then((mod) => mod.Circle),
   { ssr: false }
 );
+
+const CAFE_ICON_HTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coffee"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>`;
+const RESTAURANT_ICON_HTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utensils"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>`;
 
 // MapEventsWrapper component
 const MapEventsWrapper = dynamic(
@@ -56,6 +59,41 @@ export default function MapComponent({
   const [map, setMap] = useState<any>(null);
   const selectedPlace = places.find(p => p.id === selectedId);
   const [currentZoom, setCurrentZoom] = useState(15);
+
+  const placeIcons = useMemo(() => {
+    if (!L) return null;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const icons: Record<string, any> = {};
+    const types = ['cafe', 'restaurant'];
+    const unclaimedStates = [true, false];
+
+    for (const type of types) {
+      for (const isUnclaimed of unclaimedStates) {
+        const isCafe = type === 'cafe';
+        const bgColor = isUnclaimed ? '#9ca3af' : (isCafe ? '#d97706' : '#ea580c');
+        const iconHtml = isCafe ? CAFE_ICON_HTML : RESTAURANT_ICON_HTML;
+
+        icons[`${type}-${isUnclaimed}`] = L.divIcon({
+          className: 'custom-div-icon',
+          html: `<div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); background-color: ${bgColor}; color: white; opacity: ${isUnclaimed ? 0.8 : 1}; transition: transform 0.2s;">${iconHtml}</div>`,
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+      }
+    }
+    return icons;
+  }, [L]);
+
+  const memoUserIcon = useMemo(() => {
+    if (!L) return null;
+    return L.divIcon({
+      className: 'custom-div-icon',
+      html: `<div style="width: 20px; height: 20px; border-radius: 50%; background-color: #3b82f6; border: 3px solid white; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);"></div>`,
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    });
+  }, [L]);
   
   const fetchRef = useRef<number | null>(null);
   const [lastFetchBounds, setLastFetchBounds] = useState<string>("");
@@ -203,31 +241,7 @@ export default function MapComponent({
   }, [map]);
 
 
-  if (!L) return <div className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center"><p className="text-gray-400 font-medium">Initializing Map...</p></div>;
-
-  const getCustomIcon = (type: string, isUnclaimed: boolean) => {
-    const isCafe = type === 'cafe';
-    
-    // Explicitly define background color and border styles directly on the div
-    const bgColor = isUnclaimed ? '#9ca3af' : (isCafe ? '#d97706' : '#ea580c');
-    
-    const cafeIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coffee"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>`;
-    const restaurantIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utensils"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>`;
-
-    return L.divIcon({
-      className: 'custom-div-icon',
-      html: `<div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); background-color: ${bgColor}; color: white; opacity: ${isUnclaimed ? 0.8 : 1}; transition: transform 0.2s;">${isCafe ? cafeIconHtml : restaurantIconHtml}</div>`,
-      iconSize: [32, 32],
-      iconAnchor: [16, 16]
-    });
-  };
-
-  const userIcon = L.divIcon({
-    className: 'custom-div-icon',
-    html: `<div style="width: 20px; height: 20px; border-radius: 50%; background-color: #3b82f6; border: 3px solid white; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);"></div>`,
-    iconSize: [20, 20],
-    iconAnchor: [10, 10]
-  });
+  if (!L || !placeIcons || !memoUserIcon) return <div className="absolute inset-0 bg-gray-100 animate-pulse flex items-center justify-center"><p className="text-gray-400 font-medium">Initializing Map...</p></div>;
 
   // Only show markers if zoomed in enough
   const showMarkers = currentZoom >= 14;
@@ -258,18 +272,19 @@ export default function MapComponent({
 
             {showMarkers && places.map((place) => {
                 const isUnclaimed = !place.toiletPass && place.menu.length === 0;
+                const iconKey = `${place.type}-${isUnclaimed}`;
                 return (
                 <Marker 
                     key={place.id} 
                     position={[place.lat, place.lng]} 
-                    icon={getCustomIcon(place.type, isUnclaimed)}
+                    icon={placeIcons[iconKey]}
                     eventHandlers={{ click: () => onSelect(place.id) }}
                 />
             )})}
 
             {userLocation && (
                 <>
-                    <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
+                    <Marker position={[userLocation.lat, userLocation.lng]} icon={memoUserIcon} />
                     <Circle 
                         center={[userLocation.lat, userLocation.lng]} 
                         pathOptions={{ fillColor: '#3b82f6', fillOpacity: 0.1, color: 'transparent' }} 

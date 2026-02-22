@@ -2,13 +2,14 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { 
     MapPin, Search, Coffee, Utensils, 
     Star, ArrowLeft, KeyRound, Wifi, Copy, List, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
     Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
+import { translations, Language } from "../lib/translations";
+import { LoginModal, RegisterModal } from "../components/AuthModals";
 
 // Dynamically import the Map component with ssr: false
 const MapComponent = dynamic(() => import("../components/Map"), {
@@ -43,7 +44,13 @@ export default function Home() {
     const [isBurgerMenuOpen, setIsBurgerMenuOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [language, setLanguage] = useState<'en' | 'es'>('en');
+    const [language, setLanguage] = useState<Language>('en');
+
+    // Auth Modal States
+    const [isLoginOpen, setIsLoginOpen] = useState(false);
+    const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+
+    const t = translations[language];
 
     // Initial mobile detection
     useEffect(() => {
@@ -83,7 +90,7 @@ export default function Home() {
     const handleCopy = async (text: string) => {
         try {
             await navigator.clipboard.writeText(text);
-            showToast(`Copied: ${text}`);
+            showToast(`${t.copied}: ${text}`);
         } catch (err) {
             console.error('Failed to copy', err);
         }
@@ -96,7 +103,7 @@ export default function Home() {
 
     const handleLocateMe = () => {
         if (!navigator.geolocation) {
-            showToast("Geolocation is not supported by your browser");
+            showToast(t.geoNotSupported);
             return;
         }
 
@@ -111,11 +118,11 @@ export default function Home() {
                 setFlyToLocation(newLocation);
                 setIsLocating(false);
                 setSelectedId(null); 
-                showToast("Location updated");
+                showToast(t.locationUpdated);
             },
             () => {
                 setIsLocating(false);
-                showToast("Unable to retrieve your location");
+                showToast(t.locationError);
             }
         );
     };
@@ -149,17 +156,17 @@ export default function Home() {
                     
                     setFlyToLocation({ lat, lng: lon });
                     setSelectedId(null);
-                    showToast(`Moved to ${data[0].display_name.split(',')[0]}`);
+                    showToast(`${t.movedTo} ${data[0].display_name.split(',')[0]}`);
                     
                     if (isMobile) {
                          setIsMobilePanelOpen(false);
                     }
                 } else {
-                    showToast("Location not found");
+                    showToast(t.locationNotFound);
                 }
             } catch (error) {
                 console.error(error);
-                showToast("Search failed");
+                showToast(t.searchFailed);
             } finally {
                 setIsSearchingCity(false);
             }
@@ -186,18 +193,24 @@ export default function Home() {
                     />
                     <div className="fixed top-16 right-4 z-[2000] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 w-48 overflow-hidden animate-fade-in origin-top-right">
                         <div className="flex flex-col py-1">
-                            <Link
-                                href="/login"
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
+                            <button
+                                onClick={() => {
+                                    setIsLoginOpen(true);
+                                    setIsBurgerMenuOpen(false);
+                                }}
+                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                             >
-                                <LogIn size={18} className="text-gray-400" /> Login
-                            </Link>
-                            <Link
-                                href="/register"
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
+                                <LogIn size={18} className="text-gray-400" /> {t.login}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsRegisterOpen(true);
+                                    setIsBurgerMenuOpen(false);
+                                }}
+                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                             >
-                                <UserPlus size={18} className="text-gray-400" /> Register
-                            </Link>
+                                <UserPlus size={18} className="text-gray-400" /> {t.register}
+                            </button>
                             <div className="h-px bg-gray-100 dark:bg-gray-700 my-1" />
                             <button
                                 onClick={() => {
@@ -206,12 +219,33 @@ export default function Home() {
                                 }}
                                 className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                             >
-                                <Settings size={18} className="text-gray-400" /> Settings
+                                <Settings size={18} className="text-gray-400" /> {t.settings}
                             </button>
                         </div>
                     </div>
                 </>
             )}
+
+            {/* Auth Modals */}
+            <LoginModal
+                isOpen={isLoginOpen}
+                onClose={() => setIsLoginOpen(false)}
+                onSwitchToRegister={() => {
+                    setIsLoginOpen(false);
+                    setIsRegisterOpen(true);
+                }}
+                t={t}
+            />
+
+            <RegisterModal
+                isOpen={isRegisterOpen}
+                onClose={() => setIsRegisterOpen(false)}
+                onSwitchToLogin={() => {
+                    setIsRegisterOpen(false);
+                    setIsLoginOpen(true);
+                }}
+                t={t}
+            />
 
             {/* Settings Modal */}
             {isSettingsOpen && (
@@ -222,7 +256,7 @@ export default function Home() {
                     />
                     <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in">
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                            <h3 className="font-bold text-lg text-gray-900 dark:text-white">Settings</h3>
+                            <h3 className="font-bold text-lg text-gray-900 dark:text-white">{t.settingsTitle}</h3>
                             <button
                                 onClick={() => setIsSettingsOpen(false)}
                                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -234,20 +268,20 @@ export default function Home() {
                             {/* Theme Setting */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                    <Sun size={16} /> Appearance
+                                    <Sun size={16} /> {t.appearance}
                                 </label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         onClick={() => setTheme('light')}
                                         className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-sm font-medium transition-all ${theme === 'light' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
                                     >
-                                        <Sun size={16} /> Light
+                                        <Sun size={16} /> {t.light}
                                     </button>
                                     <button
                                         onClick={() => setTheme('dark')}
                                         className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-sm font-medium transition-all ${theme === 'dark' ? 'bg-gray-800 border-gray-700 text-white ring-1 ring-gray-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
                                     >
-                                        <Moon size={16} /> Dark
+                                        <Moon size={16} /> {t.dark}
                                     </button>
                                 </div>
                             </div>
@@ -255,20 +289,20 @@ export default function Home() {
                             {/* Language Setting */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                    <Languages size={16} /> Language
+                                    <Languages size={16} /> {t.language}
                                 </label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         onClick={() => setLanguage('en')}
                                         className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'en' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
                                     >
-                                        English
+                                        {t.english}
                                     </button>
                                     <button
-                                        onClick={() => setLanguage('es')}
-                                        className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'es' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
+                                        onClick={() => setLanguage('tr')}
+                                        className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'tr' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
                                     >
-                                        Español
+                                        {t.turkish}
                                     </button>
                                 </div>
                             </div>
@@ -278,7 +312,7 @@ export default function Home() {
                                 onClick={() => setIsSettingsOpen(false)}
                                 className="bg-gray-900 dark:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors shadow-sm"
                             >
-                                Done
+                                {t.done}
                             </button>
                         </div>
                     </div>
@@ -295,7 +329,7 @@ export default function Home() {
             {isFetchingMap && !selectedId && (
                 <div className="fixed top-20 right-4 md:top-4 md:right-4 bg-white/90 backdrop-blur-sm shadow-md rounded-full px-4 py-2 flex items-center gap-2 z-[1000] animate-pulse border border-gray-100">
                     <Loader2 size={16} className="text-amber-500 animate-spin" />
-                    <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">Scanning Area</span>
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">{t.scanningArea}</span>
                 </div>
             )}
 
@@ -338,7 +372,7 @@ export default function Home() {
                                 {/* Tag if it's live data without details */}
                                 {!selectedPlace.toiletPass && selectedPlace.menu.length === 0 && (
                                      <div className="absolute top-4 right-4 bg-black/30 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/20">
-                                         Unclaimed
+                                         {t.unclaimed}
                                      </div>
                                 )}
                             </div>
@@ -362,7 +396,7 @@ export default function Home() {
                                             <KeyRound size={80} />
                                         </div>
                                         <div className="relative z-10">
-                                            <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">Toilet Code</p>
+                                            <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">{t.toiletCode}</p>
                                             <div className="flex items-center justify-between h-8">
                                                 {selectedPlace.toiletPass ? (
                                                     <p className="text-lg font-mono font-bold text-gray-900 dark:text-white tracking-tight">{selectedPlace.toiletPass}</p>
@@ -370,7 +404,7 @@ export default function Home() {
                                                     <p className="text-sm font-semibold text-gray-400 italic">N/A</p>
                                                 )}
                                                 {selectedPlace.toiletPass && selectedPlace.toiletPass !== 'Ask to staff' && (
-                                                    <button onClick={() => handleCopy(selectedPlace.toiletPass!)} className="text-blue-500 hover:text-blue-700 bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:text-blue-300 rounded-md p-1.5 shadow-sm transition-colors" title="Copy">
+                                                    <button onClick={() => handleCopy(selectedPlace.toiletPass!)} className="text-blue-500 hover:text-blue-700 bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:text-blue-300 rounded-md p-1.5 shadow-sm transition-colors" title={t.copied}>
                                                         <Copy size={16} />
                                                     </button>
                                                 )}
@@ -384,15 +418,15 @@ export default function Home() {
                                             <Wifi size={80} />
                                         </div>
                                         <div className="relative z-10">
-                                            <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide mb-1">Free WiFi</p>
+                                            <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide mb-1">{t.wifi}</p>
                                             <div className="flex items-center justify-between h-8">
                                                 {selectedPlace.wifiPass ? (
                                                     <p className="text-sm font-mono font-bold text-gray-900 dark:text-white truncate pr-2">{selectedPlace.wifiPass}</p>
                                                 ) : (
-                                                    <p className="text-sm font-semibold text-gray-400 italic">No WiFi</p>
+                                                    <p className="text-sm font-semibold text-gray-400 italic">{t.noWifi}</p>
                                                 )}
                                                 {selectedPlace.wifiPass && (
-                                                    <button onClick={() => handleCopy(selectedPlace.wifiPass!)} className="text-green-600 hover:text-green-800 bg-white dark:bg-gray-800 dark:text-green-400 dark:hover:text-green-300 rounded-md p-1.5 shadow-sm transition-colors" title="Copy">
+                                                    <button onClick={() => handleCopy(selectedPlace.wifiPass!)} className="text-green-600 hover:text-green-800 bg-white dark:bg-gray-800 dark:text-green-400 dark:hover:text-green-300 rounded-md p-1.5 shadow-sm transition-colors" title={t.copied}>
                                                         <Copy size={16} />
                                                     </button>
                                                 )}
@@ -404,8 +438,8 @@ export default function Home() {
                                 {/* Menu Section (Snippet) */}
                                 <div className="mt-8">
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">Menu Snippet</h3>
-                                        <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-md">Last updated today</span>
+                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">{t.menuSnippet}</h3>
+                                        <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-md">{t.lastUpdated}</span>
                                     </div>
                                     <div className={`bg-white dark:bg-gray-800 border rounded-xl shadow-sm ${selectedPlace.menu.length > 0 ? 'border-gray-100 dark:border-gray-700 p-4' : 'border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 p-6 flex flex-col items-center justify-center text-center'}`}>
                                         {selectedPlace.menu.length > 0 ? (
@@ -419,7 +453,7 @@ export default function Home() {
                                                 {selectedPlace.menu.length > 3 && (
                                                     <div className="pt-3 text-center border-t border-gray-50 dark:border-gray-700 mt-2">
                                                         <button onClick={() => setIsMenuFullscreen(true)} className="text-xs font-semibold text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 flex items-center justify-center gap-1 w-full">
-                                                            <Maximize2 size={12} /> See all {selectedPlace.menu.length} items
+                                                            <Maximize2 size={12} /> {t.seeAllItems} ({selectedPlace.menu.length})
                                                         </button>
                                                     </div>
                                                 )}
@@ -432,7 +466,7 @@ export default function Home() {
 
                                 {/* Action Button */}
                                 <button className="w-full mt-6 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
-                                    Update Info
+                                    {t.updateInfo}
                                 </button>
                             </div>
                         </div>
@@ -443,7 +477,7 @@ export default function Home() {
                                 <input 
                                     type="text" 
                                     id="search-input" 
-                                    placeholder="Search cafes or restaurants..." 
+                                    placeholder={t.searchPlaceholder}
                                     className="w-full bg-gray-100 dark:bg-gray-800 dark:text-white border-none rounded-xl py-3 pl-10 pr-10 focus:ring-2 focus:ring-amber-500 focus:bg-white dark:focus:bg-gray-700 transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
                                     value={searchQuery} 
                                     onChange={handleGlobalSearch}
@@ -454,14 +488,14 @@ export default function Home() {
                             </div>
                             
                             <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4 flex items-center justify-between">
-                                Nearby Places
+                                {t.nearbyPlaces}
                             </h2>
                             
                             <div className="space-y-3 pb-8">
                                 {filteredPlaces.length === 0 && !isFetchingMap && (
                                     <div className="text-center text-gray-500 dark:text-gray-400 py-8">
                                         <MapIcon size={24} className="mx-auto mb-2 text-gray-400 dark:text-gray-600" />
-                                        No places found.
+                                        {t.noPlacesFound}
                                     </div>
                                 )}
 
@@ -480,9 +514,9 @@ export default function Home() {
                                             
                                             <div className="flex gap-3 mt-2 flex-wrap">
                                                 {place.rating > 0 && <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400"/> {place.rating}</span>}
-                                                {place.toiletPass && <span className="text-xs font-medium text-blue-500 dark:text-blue-400 flex items-center gap-1"><KeyRound size={12}/> Code</span>}
-                                                {place.menu.length > 0 && <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>}
-                                                {!hasData && <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">Unclaimed</span>}
+                                                {place.toiletPass && <span className="text-xs font-medium text-blue-500 dark:text-blue-400 flex items-center gap-1"><KeyRound size={12}/> {t.code}</span>}
+                                                {place.menu.length > 0 && <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12}/> {t.menu}</span>}
+                                                {!hasData && <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">{t.unclaimed}</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -546,7 +580,7 @@ export default function Home() {
                             className="w-full bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-4 py-3 rounded-xl shadow-lg font-medium border border-gray-100 dark:border-gray-700 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-left"
                         >
                             <Search size={20} className="text-gray-400" />
-                            <span className="text-sm">Search places...</span>
+                            <span className="text-sm">{t.searchButtonText}</span>
                         </button>
                     </div>
                 )}
@@ -563,7 +597,7 @@ export default function Home() {
                             </div>
                             <div className="min-w-0">
                                 <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight truncate">{selectedPlace.name}</h2>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Full Menu</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t.fullMenu}</p>
                             </div>
                         </div>
                         <button 
@@ -591,7 +625,7 @@ export default function Home() {
                             </div>
                             <div className="text-center mt-6 mb-8 flex flex-col items-center gap-2">
                                 <ShieldCheck size={20} className="text-gray-300 dark:text-gray-600" />
-                                <p className="text-xs text-gray-400 dark:text-gray-500">Prices are user-submitted and may not be 100% accurate or up-to-date.</p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500">{t.pricesDisclaimer}</p>
                             </div>
                         </div>
                     </div>

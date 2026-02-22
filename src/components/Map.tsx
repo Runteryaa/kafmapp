@@ -103,8 +103,8 @@ export default function MapComponent({
       const query = `
           [out:json][timeout:10];
           (
-              node["amenity"~"cafe|restaurant"](${boundsStr});
-              way["amenity"~"cafe|restaurant"](${boundsStr});
+              node["amenity"~"cafe|restaurant|fast_food|bar|pub"](${boundsStr});
+              way["amenity"~"cafe|restaurant|fast_food|bar|pub"](${boundsStr});
           );
           out center;
       `;
@@ -168,7 +168,7 @@ export default function MapComponent({
                       id: el.id,
                       name: el.tags!.name || "Unknown",
                       lat, lng,
-                      type: el.tags!.amenity === 'cafe' ? 'cafe' : 'restaurant',
+                      type: el.tags!.amenity as Place['type'],
                       address: el.tags!['addr:street'] ? `${el.tags!['addr:street']} ${el.tags!['addr:housenumber'] || ''}` : "Address unknown",
                       toiletPass: null, 
                       wifiPass: null, 
@@ -214,17 +214,55 @@ export default function MapComponent({
   );
 
   const getCustomIcon = (type: string, isUnclaimed: boolean) => {
-    const isCafe = type === 'cafe';
-    
-    // Explicitly define background color and border styles directly on the div
-    const bgColor = isUnclaimed ? '#9ca3af' : (isCafe ? '#d97706' : '#ea580c');
+    let bgColor;
+    let iconHtml;
+
+    if (isUnclaimed) {
+        bgColor = '#9ca3af'; // gray-400
+    } else {
+        switch (type) {
+            case 'cafe':
+                bgColor = '#d97706'; // amber-600
+                break;
+            case 'fast_food':
+                bgColor = '#dc2626'; // red-600
+                break;
+            case 'bar':
+            case 'pub':
+                bgColor = '#9333ea'; // purple-600
+                break;
+            case 'restaurant':
+            default:
+                bgColor = '#ea580c'; // orange-600
+                break;
+        }
+    }
     
     const cafeIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coffee"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>`;
     const restaurantIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utensils"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>`;
+    const fastFoodIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pizza"><path d="m12 14-1 1"/><path d="m13.75 18.25-1.25 1.42"/><path d="M17.775 5.654a15.68 15.68 0 0 0-12.121 12.12"/><path d="M18.8 9.3a1 1 0 0 0 2.1 7.7"/><path d="M21.964 20.732a1 1 0 0 1-1.232 1.232l-18-5a1 1 0 0 1-.695-1.232A19.68 19.68 0 0 1 15.732 2.037a1 1 0 0 1 1.232.695z"/></svg>`;
+    const barIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-beer"><path d="M17 11h1a3 3 0 0 1 0 6h-1"/><path d="M9 12v6"/><path d="M13 12v6"/><path d="M14 7.5c-1 0-1.44.5-3 .5s-2-.5-3-.5-1.72.5-2.5.5a2.5 2.5 0 0 1 0-5c.78 0 1.57.5 2.5.5S9.44 2 11 2s2 1.5 3 1.5 1.72-.5 2.5-.5a2.5 2.5 0 0 1 0 5c-.78 0-1.5-.5-2.5-.5Z"/><path d="M5 8v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/></svg>`;
+
+    switch (type) {
+        case 'cafe':
+            iconHtml = cafeIconHtml;
+            break;
+        case 'fast_food':
+            iconHtml = fastFoodIconHtml;
+            break;
+        case 'bar':
+        case 'pub':
+            iconHtml = barIconHtml;
+            break;
+        case 'restaurant':
+        default:
+            iconHtml = restaurantIconHtml;
+            break;
+    }
 
     return L.divIcon({
       className: 'custom-div-icon',
-      html: `<div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); background-color: ${bgColor}; color: white; opacity: ${isUnclaimed ? 0.8 : 1}; transition: transform 0.2s;">${isCafe ? cafeIconHtml : restaurantIconHtml}</div>`,
+      html: `<div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 2px solid white; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); background-color: ${bgColor}; color: white; opacity: ${isUnclaimed ? 0.8 : 1}; transition: transform 0.2s;">${iconHtml}</div>`,
       iconSize: [32, 32],
       iconAnchor: [16, 16]
     });

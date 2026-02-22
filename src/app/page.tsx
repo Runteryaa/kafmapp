@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { 
-    MapPin, Search, Coffee, Utensils, 
+    MapPin, Search, Coffee, Utensils, Pizza, Beer,
     Star, ArrowLeft, KeyRound, Wifi, Copy, List, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
     Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus
 } from "lucide-react";
@@ -23,6 +23,45 @@ const MapComponent = dynamic(() => import("../components/Map"), {
     </div>
   ),
 });
+
+const getPlaceStyle = (type: string) => {
+    switch (type) {
+        case 'cafe':
+            return {
+                Icon: Coffee,
+                bgClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500',
+                gradientClass: 'from-amber-400 to-orange-500',
+                borderHoverClass: 'hover:border-amber-200 dark:hover:border-amber-900',
+                textHoverClass: 'group-hover:text-amber-700 dark:group-hover:text-amber-500'
+            };
+        case 'fast_food':
+             return {
+                Icon: Pizza,
+                bgClass: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-500',
+                gradientClass: 'from-red-500 to-red-600',
+                borderHoverClass: 'hover:border-red-200 dark:hover:border-red-900',
+                textHoverClass: 'group-hover:text-red-700 dark:group-hover:text-red-500'
+            };
+        case 'bar':
+        case 'pub':
+             return {
+                Icon: Beer,
+                bgClass: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-500',
+                gradientClass: 'from-purple-500 to-purple-600',
+                borderHoverClass: 'hover:border-purple-200 dark:hover:border-purple-900',
+                textHoverClass: 'group-hover:text-purple-700 dark:group-hover:text-purple-500'
+            };
+        case 'restaurant':
+        default:
+             return {
+                Icon: Utensils,
+                bgClass: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500',
+                gradientClass: 'from-orange-500 to-red-500',
+                borderHoverClass: 'hover:border-orange-200 dark:hover:border-orange-900',
+                textHoverClass: 'group-hover:text-orange-700 dark:group-hover:text-orange-500'
+            };
+    }
+};
 
 export default function Home() {
     const [searchQuery, setSearchQuery] = useState("");
@@ -396,11 +435,14 @@ export default function Home() {
 
                 {/* Dynamic Content Area */}
                 <div className="flex-1 overflow-y-auto relative w-full h-full bg-white dark:bg-gray-800">
-                    {selectedPlace ? (
+                    {selectedPlace ? (() => {
+                        const style = getPlaceStyle(selectedPlace.type);
+                        const { Icon } = style;
+                        return (
                         // --- DETAILS VIEW ---
                         <div className="animate-fade-in relative pb-8">
                             {/* Header Image area (gradient placeholder) */}
-                            <div className={`h-32 bg-gradient-to-r relative ${selectedPlace.type === 'cafe' ? 'from-amber-400 to-orange-500' : 'from-orange-500 to-red-500'}`}>
+                            <div className={`h-32 bg-gradient-to-r relative ${style.gradientClass}`}>
                                 <button onClick={handleClearSelection} className="absolute top-4 left-4 bg-white/20 hover:bg-white/40 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors">
                                     <ArrowLeft size={16} />
                                 </button>
@@ -415,8 +457,8 @@ export default function Home() {
                             <div className="px-6 pb-6 relative -mt-6">
                                 {/* Floating Icon */}
                                 <div className="w-14 h-14 bg-white dark:bg-gray-800 rounded-full p-1 shadow-lg flex items-center justify-center mb-3">
-                                    <div className={`w-full h-full rounded-full flex items-center justify-center ${selectedPlace.type === 'cafe' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500'}`}>
-                                        {selectedPlace.type === 'cafe' ? <Coffee size={24} /> : <Utensils size={24} />}
+                                    <div className={`w-full h-full rounded-full flex items-center justify-center ${style.bgClass}`}>
+                                        <Icon size={24} />
                                     </div>
                                 </div>
 
@@ -505,7 +547,8 @@ export default function Home() {
                                 </button>
                             </div>
                         </div>
-                    ) : (
+                        );
+                    })() : (
                         // --- LIST VIEW ---
                         <div className="p-6">
                             <div className="relative mb-6">
@@ -535,16 +578,17 @@ export default function Home() {
                                 )}
 
                                 {filteredPlaces.map(place => {
-                                    const isCafe = place.type === 'cafe';
                                     const hasData = place.toiletPass || place.menu.length > 0;
+                                    const style = getPlaceStyle(place.type);
+                                    const { Icon } = style;
 
                                     return (
-                                    <div key={place.id} onClick={() => handleSelect(place.id)} className={`group cursor-pointer bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 transition-all flex items-start gap-4 hover:shadow-md hover:border-amber-200 dark:hover:border-amber-900`}>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isCafe ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500'}`}>
-                                            {isCafe ? <Coffee size={18} /> : <Utensils size={18} />}
+                                    <div key={place.id} onClick={() => handleSelect(place.id)} className={`group cursor-pointer bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 transition-all flex items-start gap-4 hover:shadow-md ${style.borderHoverClass}`}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${style.bgClass}`}>
+                                            <Icon size={18} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors pr-2">{place.name}</h3>
+                                            <h3 className={`font-semibold text-gray-900 dark:text-gray-100 truncate transition-colors pr-2 ${style.textHoverClass}`}>{place.name}</h3>
                                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{place.address}</p>
                                             
                                             <div className="flex gap-3 mt-2 flex-wrap">
@@ -626,13 +670,17 @@ export default function Home() {
             </div>
 
             {/* FULLSCREEN MENU MODAL */}
-            {isMenuFullscreen && selectedPlace && (
+            {isMenuFullscreen && selectedPlace && (() => {
+                const style = getPlaceStyle(selectedPlace.type);
+                const { Icon } = style;
+
+                return (
                 <div className="fixed inset-0 z-[3000] bg-white dark:bg-gray-900 flex flex-col animate-fade-in overflow-hidden">
                     {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
                         <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${selectedPlace.type === 'cafe' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500'}`}>
-                                {selectedPlace.type === 'cafe' ? <Coffee size={20} /> : <Utensils size={20} />}
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${style.bgClass}`}>
+                                <Icon size={20} />
                             </div>
                             <div className="min-w-0">
                                 <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight truncate">{selectedPlace.name}</h2>
@@ -669,7 +717,8 @@ export default function Home() {
                         </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
         </div>
     );
 }

@@ -8,7 +8,7 @@ export interface Place {
   name: string;
   lat: number;
   lng: number;
-  type: "cafe" | "restaurant";
+  type: "cafe" | "restaurant" | "fast_food" | "bar" | "pub";
   address: string;
   toiletPass: string | null;
   wifiPass: string | null;
@@ -70,5 +70,19 @@ export const mockPlaces: Place[] = [
       {item: "Latte", price: "₺75"}, {item: "Türk Kahvesi", price: "₺50"}, {item: "Filtre Kahve", price: "₺65"}, {item: "Çay", price: "₺20"},
       {item: "Ev Yapımı Limonata", price: "₺60"}, {item: "Karadut Suyu", price: "₺65"}, {item: "Sıcak Çikolata", price: "₺75"}, {item: "Salep", price: "₺80"}
     ] 
+  },
+  {
+    id: 7, name: "Hızlı Pizza", lat: 40.0360, lng: 32.8960, type: "fast_food", address: "Merkez Cad. No:20", toiletPass: "1122", wifiPass: "pizza_express", rating: 4.3,
+    menu: [
+      {item: "Margarita Pizza (Orta)", price: "₺150"}, {item: "Karışık Pizza (Orta)", price: "₺180"}, {item: "Sucuklu Pizza (Orta)", price: "₺170"},
+      {item: "Patates Kızartması", price: "₺60"}, {item: "Soğan Halkası", price: "₺50"}, {item: "Kola", price: "₺35"}, {item: "Ayran", price: "₺25"}
+    ]
+  },
+  {
+    id: 8, name: "Dublin Pub", lat: 40.0340, lng: 32.8940, type: "pub", address: "İstasyon Cad. No:15", toiletPass: "9988", wifiPass: "dublin_guest", rating: 4.7,
+    menu: [
+      {item: "Fıçı Bira (50cl)", price: "₺120"}, {item: "Şişe Bira", price: "₺130"}, {item: "Viski (Tek)", price: "₺180"}, {item: "Cin Tonik", price: "₺160"},
+      {item: "Patates Tabağı", price: "₺90"}, {item: "Sosis Tabağı", price: "₺140"}, {item: "Çerez Tabağı", price: "₺60"}
+    ]
   }
 ];

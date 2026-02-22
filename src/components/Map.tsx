@@ -92,7 +92,6 @@ export default function MapComponent({
       
       // Require users to zoom in quite far (Zoom 15+) before fetching to avoid Overpass rate limiting
       if (zoom < 15) {
-           onOsmPlacesFetch([]); 
            return; 
       }
       

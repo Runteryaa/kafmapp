@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { 
     MapPin, Search, Coffee, Utensils, 
@@ -45,11 +45,19 @@ export default function Home() {
 
     // Combine local mock data with live OSM data
     // OSM places that match a mock place by name (roughly) are ignored so mock data takes precedence
-    const combinedPlaces = [...mockPlaces, ...osmPlaces.filter(op => !mockPlaces.some(mp => mp.name.toLowerCase() === op.name.toLowerCase()))];
+    const combinedPlaces = useMemo(() => [
+        ...mockPlaces,
+        ...osmPlaces.filter(op => !mockPlaces.some(mp => mp.name.toLowerCase() === op.name.toLowerCase()))
+    ], [osmPlaces, mockPlaces]);
     
     // Filter by search
-    const filteredPlaces = combinedPlaces.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
-    const selectedPlace = combinedPlaces.find(p => p.id === selectedId);
+    const filteredPlaces = useMemo(() =>
+        combinedPlaces.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())),
+    [combinedPlaces, searchQuery]);
+
+    const selectedPlace = useMemo(() =>
+        combinedPlaces.find(p => p.id === selectedId),
+    [combinedPlaces, selectedId]);
 
     // Actions
     const handleSelect = (id: number) => {

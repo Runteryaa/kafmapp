@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { 
-    MapPin, Search, Coffee, Utensils, 
-    Star, ArrowLeft, KeyRound, Wifi, Copy, List, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
-    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus
+    MapPin, Search, Coffee, Utensils, Pizza, Beer,
+    Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
@@ -24,6 +23,45 @@ const MapComponent = dynamic(() => import("../components/Map"), {
   ),
 });
 
+const getPlaceStyle = (type: string) => {
+    switch (type) {
+        case 'cafe':
+            return {
+                Icon: Coffee,
+                bgClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500',
+                gradientClass: 'from-amber-400 to-orange-500',
+                borderHoverClass: 'hover:border-amber-200 dark:hover:border-amber-900',
+                textHoverClass: 'group-hover:text-amber-700 dark:group-hover:text-amber-500'
+            };
+        case 'fast_food':
+             return {
+                Icon: Pizza,
+                bgClass: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-500',
+                gradientClass: 'from-red-500 to-red-600',
+                borderHoverClass: 'hover:border-red-200 dark:hover:border-red-900',
+                textHoverClass: 'group-hover:text-red-700 dark:group-hover:text-red-500'
+            };
+        case 'bar':
+        case 'pub':
+             return {
+                Icon: Beer,
+                bgClass: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-500',
+                gradientClass: 'from-purple-500 to-purple-600',
+                borderHoverClass: 'hover:border-purple-200 dark:hover:border-purple-900',
+                textHoverClass: 'group-hover:text-purple-700 dark:group-hover:text-purple-500'
+            };
+        case 'restaurant':
+        default:
+             return {
+                Icon: Utensils,
+                bgClass: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500',
+                gradientClass: 'from-orange-500 to-red-500',
+                borderHoverClass: 'hover:border-orange-200 dark:hover:border-orange-900',
+                textHoverClass: 'group-hover:text-orange-700 dark:group-hover:text-orange-500'
+            };
+    }
+};
+
 export default function Home() {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -37,6 +75,13 @@ export default function Home() {
     const [isFetchingMap, setIsFetchingMap] = useState(false);
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
+    const [manualFetchTrigger, setManualFetchTrigger] = useState(0);
+
+    // Panel drag state
+    const [panelHeight, setPanelHeight] = useState(60); // vh
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStartY = useRef(0);
+    const dragStartHeight = useRef(0);
 
     // New state for features
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -87,7 +132,6 @@ export default function Home() {
                 setIsLocating(false);
             }
         );
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Initial mobile detection
@@ -171,6 +215,56 @@ export default function Home() {
 
     const handleZoomOut = () => {
         if (mapInstance) mapInstance.zoomOut();
+    };
+
+    // Panel Drag Handlers
+    const handleTouchStart = (e: React.TouchEvent | React.MouseEvent) => {
+        if (!isMobile) return;
+
+        // Only trigger if we're touching the handle or header, not the content
+        // This is handled by where we attach the events
+
+        setIsDragging(true);
+        const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
+        dragStartY.current = clientY;
+        dragStartHeight.current = panelHeight;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent | React.MouseEvent) => {
+        if (!isDragging || !isMobile) return;
+
+        const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY;
+        const deltaY = dragStartY.current - clientY; // Positive = Drag Up
+        const windowHeight = window.innerHeight;
+
+        // Convert delta pixels to vh
+        const deltaVh = (deltaY / windowHeight) * 100;
+
+        // Calculate new height
+        let newHeight = dragStartHeight.current + deltaVh;
+
+        // Clamp values
+        if (newHeight > 100) newHeight = 100;
+        if (newHeight < 20) newHeight = 20;
+
+        setPanelHeight(newHeight);
+    };
+
+    const handleTouchEnd = () => {
+        if (!isDragging || !isMobile) return;
+        setIsDragging(false);
+
+        // Snap logic
+        if (panelHeight > 80) { // If dragged past 80%, snap to full
+            setPanelHeight(100);
+        } else if (panelHeight < 45) { // If dragged below 45%, close
+            setIsMobilePanelOpen(false);
+            setSelectedId(null);
+            // Reset height for next open after transition
+            setTimeout(() => setPanelHeight(60), 300);
+        } else { // Snap back to default
+            setPanelHeight(60);
+        }
     };
 
     // Global city/area search using Nominatim (OpenStreetMap's geocoder)
@@ -370,15 +464,37 @@ export default function Home() {
 
             {/* Sidebar / Details Panel */}
             <div 
-                className={`absolute bottom-0 left-0 w-full h-[60vh] md:h-full md:w-96 md:relative bg-white dark:bg-gray-900 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-xl z-[1000] flex flex-col transform transition-transform duration-300 ease-in-out rounded-t-3xl md:rounded-none ${isMobile && !isMobilePanelOpen && !selectedId ? 'translate-y-full' : 'translate-y-0'}`}
+                className={`absolute bottom-0 left-0 w-full md:h-full md:w-96 md:relative bg-white dark:bg-gray-900 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-xl z-[1000] flex flex-col transform transition-transform duration-300 ease-in-out rounded-t-3xl md:rounded-none ${isMobile && !isMobilePanelOpen && !selectedId ? 'translate-y-full' : 'translate-y-0'}`}
+                style={{
+                    height: isMobile ? `${panelHeight}vh` : '100%',
+                    transition: isDragging ? 'none' : undefined
+                }}
             >
                 {/* Mobile drag handle */}
-                <div className="w-full flex justify-center py-3 md:hidden cursor-pointer" onClick={() => toggleMobilePanel()}>
+                <div
+                    className="w-full flex justify-center py-3 md:hidden cursor-grab active:cursor-grabbing touch-none"
+                    onMouseDown={handleTouchStart}
+                    onMouseMove={handleTouchMove}
+                    onMouseUp={handleTouchEnd}
+                    onMouseLeave={handleTouchEnd}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                >
                     <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
                 </div>
 
-                {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0 bg-white dark:bg-gray-800">
+                {/* Header - Also draggable */}
+                <div
+                    className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0 bg-white dark:bg-gray-800 touch-none"
+                    onMouseDown={handleTouchStart}
+                    onMouseMove={handleTouchMove}
+                    onMouseUp={handleTouchEnd}
+                    onMouseLeave={handleTouchEnd}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                >
                     <div className="flex items-center gap-2">
                         <div className="bg-amber-100 text-amber-700 p-2 rounded-lg">
                             <MapPin size={20} className="stroke-[2.5]" />
@@ -396,11 +512,14 @@ export default function Home() {
 
                 {/* Dynamic Content Area */}
                 <div className="flex-1 overflow-y-auto relative w-full h-full bg-white dark:bg-gray-800">
-                    {selectedPlace ? (
+                    {selectedPlace ? (() => {
+                        const style = getPlaceStyle(selectedPlace.type);
+                        const { Icon } = style;
+                        return (
                         // --- DETAILS VIEW ---
                         <div className="animate-fade-in relative pb-8">
                             {/* Header Image area (gradient placeholder) */}
-                            <div className={`h-32 bg-gradient-to-r relative ${selectedPlace.type === 'cafe' ? 'from-amber-400 to-orange-500' : 'from-orange-500 to-red-500'}`}>
+                            <div className={`h-32 bg-gradient-to-r relative ${style.gradientClass}`}>
                                 <button onClick={handleClearSelection} className="absolute top-4 left-4 bg-white/20 hover:bg-white/40 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors">
                                     <ArrowLeft size={16} />
                                 </button>
@@ -415,8 +534,8 @@ export default function Home() {
                             <div className="px-6 pb-6 relative -mt-6">
                                 {/* Floating Icon */}
                                 <div className="w-14 h-14 bg-white dark:bg-gray-800 rounded-full p-1 shadow-lg flex items-center justify-center mb-3">
-                                    <div className={`w-full h-full rounded-full flex items-center justify-center ${selectedPlace.type === 'cafe' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500'}`}>
-                                        {selectedPlace.type === 'cafe' ? <Coffee size={24} /> : <Utensils size={24} />}
+                                    <div className={`w-full h-full rounded-full flex items-center justify-center ${style.bgClass}`}>
+                                        <Icon size={24} />
                                     </div>
                                 </div>
 
@@ -505,7 +624,8 @@ export default function Home() {
                                 </button>
                             </div>
                         </div>
-                    ) : (
+                        );
+                    })() : (
                         // --- LIST VIEW ---
                         <div className="p-6">
                             <div className="relative mb-6">
@@ -535,23 +655,55 @@ export default function Home() {
                                 )}
 
                                 {filteredPlaces.map(place => {
-                                    const isCafe = place.type === 'cafe';
-                                    const hasData = place.toiletPass || place.menu.length > 0;
+                                    const style = getPlaceStyle(place.type);
+                                    const { Icon } = style;
 
                                     return (
-                                    <div key={place.id} onClick={() => handleSelect(place.id)} className={`group cursor-pointer bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 transition-all flex items-start gap-4 hover:shadow-md hover:border-amber-200 dark:hover:border-amber-900`}>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${isCafe ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500'}`}>
-                                            {isCafe ? <Coffee size={18} /> : <Utensils size={18} />}
+                                    <div key={place.id} onClick={() => handleSelect(place.id)} className={`group cursor-pointer bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 transition-all flex items-start gap-4 hover:shadow-md ${style.borderHoverClass}`}>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${style.bgClass}`}>
+                                            <Icon size={18} />
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-amber-700 dark:group-hover:text-amber-500 transition-colors pr-2">{place.name}</h3>
+                                            <h3 className={`font-semibold text-gray-900 dark:text-gray-100 truncate transition-colors pr-2 ${style.textHoverClass}`}>{place.name}</h3>
                                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{place.address}</p>
                                             
                                             <div className="flex gap-3 mt-2 flex-wrap">
                                                 {place.rating > 0 && <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400"/> {place.rating}</span>}
-                                                {place.toiletPass && <span className="text-xs font-medium text-blue-500 dark:text-blue-400 flex items-center gap-1"><KeyRound size={12}/> Code</span>}
-                                                {place.menu.length > 0 && <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>}
-                                                {!hasData && <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">Unclaimed</span>}
+
+                                                {place.isRegistered ? (
+                                                    <>
+                                                        {/* Toilet Status */}
+                                                        {(() => {
+                                                            const pass = place.toiletPass;
+                                                            let colorClass = "text-yellow-600 dark:text-yellow-500"; // Default: Yellow (Code)
+                                                            if (pass === null) colorClass = "text-gray-400 dark:text-gray-500"; // Gray (Unknown)
+                                                            else if (pass === 'No' || pass === 'None') colorClass = "text-red-500 dark:text-red-400"; // Red (Absent)
+                                                            else if (pass === 'Free' || pass === 'Open' || pass === 'Ask to staff') colorClass = "text-green-600 dark:text-green-500"; // Green (Available)
+
+                                                            return <span className={`text-xs font-medium ${colorClass} flex items-center gap-1`}><KeyRound size={12}/> WC</span>
+                                                        })()}
+
+                                                        {/* WiFi Status */}
+                                                        {(() => {
+                                                            const pass = place.wifiPass;
+                                                            let colorClass = "text-yellow-600 dark:text-yellow-500"; // Default: Yellow (Code)
+                                                            if (pass === null) colorClass = "text-gray-400 dark:text-gray-500"; // Gray (Unknown)
+                                                            else if (pass === 'No' || pass === 'None') colorClass = "text-red-500 dark:text-red-400"; // Red (Absent)
+                                                            else if (pass === 'Free' || pass === 'Open' || pass === 'Ask to staff') colorClass = "text-green-600 dark:text-green-500"; // Green (Available)
+
+                                                            return <span className={`text-xs font-medium ${colorClass} flex items-center gap-1`}><Wifi size={12}/> Wifi</span>
+                                                        })()}
+
+                                                        {/* Menu Status */}
+                                                        {place.menu.length > 0 ? (
+                                                            <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>
+                                                        ) : (
+                                                            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">Unclaimed</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -575,6 +727,7 @@ export default function Home() {
                     setIsFetchingMap={setIsFetchingMap}
                     onMapReady={setMapInstance}
                     theme={theme}
+                    manualTrigger={manualFetchTrigger}
                 />
                 
                 {/* Floating Map Controls - Zoom Buttons (Left) */}
@@ -604,6 +757,14 @@ export default function Home() {
                     >
                         {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
                     </button>
+                    <button
+                        onClick={() => setManualFetchTrigger(Date.now())}
+                        className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isFetchingMap ? 'text-amber-500' : ''}`}
+                        title="Scan Area"
+                        disabled={isFetchingMap}
+                    >
+                        {isFetchingMap ? <Loader2 size={20} className="animate-spin" /> : <RefreshCw size={20} />}
+                    </button>
                 </div>
 
                 {/* Mobile Open Panel Button (Visible when panel is closed on mobile) */}
@@ -626,13 +787,17 @@ export default function Home() {
             </div>
 
             {/* FULLSCREEN MENU MODAL */}
-            {isMenuFullscreen && selectedPlace && (
+            {isMenuFullscreen && selectedPlace && (() => {
+                const style = getPlaceStyle(selectedPlace.type);
+                const { Icon } = style;
+
+                return (
                 <div className="fixed inset-0 z-[3000] bg-white dark:bg-gray-900 flex flex-col animate-fade-in overflow-hidden">
                     {/* Modal Header */}
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
                         <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${selectedPlace.type === 'cafe' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-500' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500'}`}>
-                                {selectedPlace.type === 'cafe' ? <Coffee size={20} /> : <Utensils size={20} />}
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${style.bgClass}`}>
+                                <Icon size={20} />
                             </div>
                             <div className="min-w-0">
                                 <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight truncate">{selectedPlace.name}</h2>
@@ -669,7 +834,8 @@ export default function Home() {
                         </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
         </div>
     );
 }

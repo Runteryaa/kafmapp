@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import { 
     MapPin, Search, Coffee, Utensils, Pizza, Beer,
     Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
-    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
@@ -75,6 +75,7 @@ export default function Home() {
     const [isFetchingMap, setIsFetchingMap] = useState(false);
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
+    const [manualFetchTrigger, setManualFetchTrigger] = useState(0);
 
     // Panel drag state
     const [panelHeight, setPanelHeight] = useState(60); // vh
@@ -696,6 +697,7 @@ export default function Home() {
                     setIsFetchingMap={setIsFetchingMap}
                     onMapReady={setMapInstance}
                     theme={theme}
+                    manualTrigger={manualFetchTrigger}
                 />
                 
                 {/* Floating Map Controls - Zoom Buttons (Left) */}
@@ -724,6 +726,14 @@ export default function Home() {
                         title="Locate Me"
                     >
                         {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
+                    </button>
+                    <button
+                        onClick={() => setManualFetchTrigger(Date.now())}
+                        className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isFetchingMap ? 'text-amber-500' : ''}`}
+                        title="Scan Area"
+                        disabled={isFetchingMap}
+                    >
+                        {isFetchingMap ? <Loader2 size={20} className="animate-spin" /> : <RefreshCw size={20} />}
                     </button>
                 </div>
 

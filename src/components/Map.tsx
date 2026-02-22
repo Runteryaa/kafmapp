@@ -44,14 +44,15 @@ const MapEventsWrapper = dynamic(
 );
 
 export default function MapComponent({ 
-    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap, onMapReady, theme
+    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap, onMapReady, theme, manualTrigger
 }: { 
     places: Place[], onSelect: (id: number) => void, selectedId: number | null, isMobile: boolean, 
     userLocation: LocationState | null, flyToLocation: LocationState | null,
     onOsmPlacesFetch: (places: Place[]) => void, setIsFetchingMap: (b: boolean) => void,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onMapReady?: (map: any) => void,
-    theme?: 'light' | 'dark'
+    theme?: 'light' | 'dark',
+    manualTrigger?: number
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [L, setL] = useState<any>(null);
@@ -85,7 +86,7 @@ export default function MapComponent({
   }, [map, flyToLocation, selectedPlace, isMobile, userLocation]);
 
   // Overpass Fetcher
-  const fetchPlaces = async () => {
+  const fetchPlaces = async (force: boolean = false) => {
       if (!map) return;
       const zoom = map.getZoom();
       
@@ -99,7 +100,7 @@ export default function MapComponent({
 
       // Optimization: Check if current view is fully inside the already loaded area
       // If yes, we don't need to fetch again
-      if (loadedBounds && loadedBounds.contains(currentBounds)) {
+      if (!force && loadedBounds && loadedBounds.contains(currentBounds)) {
           return;
       }
       
@@ -211,6 +212,14 @@ export default function MapComponent({
       return () => { if (fetchRef.current) clearTimeout(fetchRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
+
+  // Listen for manual trigger
+  useEffect(() => {
+    if (manualTrigger) {
+        fetchPlaces(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manualTrigger]);
 
 
   if (!L) return (

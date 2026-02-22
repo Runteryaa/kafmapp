@@ -28,6 +28,11 @@
   .animate-fade-in {
     animation: fadeIn 0.3s ease-in-out forwards;
   }
+
+  /* Brightness filter for dark mode map tiles */
+  .map-tiles-dark {
+    filter: brightness(2) contrast(0.7);
+  }
 }
 
 @keyframes fadeIn {

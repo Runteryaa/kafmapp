@@ -9,6 +9,7 @@ import {
     Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
+import { LoginModal, RegisterModal } from "../components/AuthModals";
 
 // Dynamically import the Map component with ssr: false
 const MapComponent = dynamic(() => import("../components/Map"), {
@@ -44,6 +45,50 @@ export default function Home() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     const [language, setLanguage] = useState<'en' | 'es'>('en');
+    const [isThemeLoaded, setIsThemeLoaded] = useState(false);
+    const [isLoginOpen, setIsLoginOpen] = useState(false);
+    const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+
+    // Load theme from local storage
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+        if (savedTheme) {
+            setTheme(savedTheme);
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            setTheme('dark');
+        }
+        setIsThemeLoaded(true);
+    }, []);
+
+    // Save theme to local storage
+    useEffect(() => {
+        if (isThemeLoaded) {
+            localStorage.setItem('theme', theme);
+        }
+    }, [theme, isThemeLoaded]);
+
+    // Auto-locate user on initial load
+    useEffect(() => {
+        if (!navigator.geolocation) return;
+
+        setIsLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const newLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                setUserLocation(newLocation);
+                setFlyToLocation(newLocation);
+                setIsLocating(false);
+            },
+            (error) => {
+                console.warn("Auto-location failed on load:", error);
+                setIsLocating(false);
+            }
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Initial mobile detection
     useEffect(() => {
@@ -167,7 +212,7 @@ export default function Home() {
     };
 
     return (
-        <div className={`flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans selection:bg-amber-200 relative ${theme === 'dark' ? 'dark' : ''}`}>
+        <div className={`flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 font-sans selection:bg-amber-200 relative ${theme === 'dark' ? 'dark' : ''}`}>
             
             {/* Burger Menu Button */}
             <button
@@ -186,18 +231,24 @@ export default function Home() {
                     />
                     <div className="fixed top-16 right-4 z-[2000] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 w-48 overflow-hidden animate-fade-in origin-top-right">
                         <div className="flex flex-col py-1">
-                            <Link
-                                href="/login"
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
+                            <button
+                                onClick={() => {
+                                    setIsLoginOpen(true);
+                                    setIsBurgerMenuOpen(false);
+                                }}
+                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                             >
                                 <LogIn size={18} className="text-gray-400" /> Login
-                            </Link>
-                            <Link
-                                href="/register"
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsRegisterOpen(true);
+                                    setIsBurgerMenuOpen(false);
+                                }}
+                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                             >
                                 <UserPlus size={18} className="text-gray-400" /> Register
-                            </Link>
+                            </button>
                             <div className="h-px bg-gray-100 dark:bg-gray-700 my-1" />
                             <button
                                 onClick={() => {
@@ -212,6 +263,24 @@ export default function Home() {
                     </div>
                 </>
             )}
+
+            {/* Auth Modals */}
+            <LoginModal
+                isOpen={isLoginOpen}
+                onClose={() => setIsLoginOpen(false)}
+                onSwitchToRegister={() => {
+                    setIsLoginOpen(false);
+                    setIsRegisterOpen(true);
+                }}
+            />
+            <RegisterModal
+                isOpen={isRegisterOpen}
+                onClose={() => setIsRegisterOpen(false)}
+                onSwitchToLogin={() => {
+                    setIsRegisterOpen(false);
+                    setIsLoginOpen(true);
+                }}
+            />
 
             {/* Settings Modal */}
             {isSettingsOpen && (
@@ -309,7 +378,7 @@ export default function Home() {
                 </div>
 
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 bg-white dark:bg-gray-900">
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0 bg-white dark:bg-gray-800">
                     <div className="flex items-center gap-2">
                         <div className="bg-amber-100 text-amber-700 p-2 rounded-lg">
                             <MapPin size={20} className="stroke-[2.5]" />
@@ -326,7 +395,7 @@ export default function Home() {
                 </div>
 
                 {/* Dynamic Content Area */}
-                <div className="flex-1 overflow-y-auto relative w-full h-full bg-white dark:bg-gray-900">
+                <div className="flex-1 overflow-y-auto relative w-full h-full bg-white dark:bg-gray-800">
                     {selectedPlace ? (
                         // --- DETAILS VIEW ---
                         <div className="animate-fade-in relative pb-8">
@@ -494,7 +563,7 @@ export default function Home() {
             </div>
 
             {/* Map Area */}
-            <div className="flex-1 w-full h-full z-0 relative bg-gray-100 dark:bg-gray-900">
+            <div className="flex-1 w-full h-full z-0 relative bg-gray-100 dark:bg-gray-800">
                 <MapComponent 
                     places={filteredPlaces} 
                     onSelect={handleSelect} 
@@ -508,15 +577,8 @@ export default function Home() {
                     theme={theme}
                 />
                 
-                {/* Floating Map Controls */}
+                {/* Floating Map Controls - Zoom Buttons (Left) */}
                 <div className={`absolute left-6 z-[500] flex flex-col gap-3 transition-all duration-300 ${isMobileSearchVisible ? 'bottom-24' : 'bottom-6'}`}>
-                    <button
-                        onClick={handleLocateMe}
-                        className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isLocating ? 'animate-pulse text-blue-500' : ''}`}
-                        title="Locate Me"
-                    >
-                        {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
-                    </button>
                     <button
                         onClick={handleZoomIn}
                         className="w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
@@ -530,6 +592,17 @@ export default function Home() {
                         title="Zoom Out"
                     >
                         <Minus size={20} />
+                    </button>
+                </div>
+
+                {/* Floating Map Controls - Locate Me Button (Right) */}
+                <div className={`absolute right-6 z-[500] flex flex-col gap-3 transition-all duration-300 ${isMobileSearchVisible ? 'bottom-24' : 'bottom-6'}`}>
+                    <button
+                        onClick={handleLocateMe}
+                        className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isLocating ? 'animate-pulse text-blue-500' : ''}`}
+                        title="Locate Me"
+                    >
+                        {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
                     </button>
                 </div>
 

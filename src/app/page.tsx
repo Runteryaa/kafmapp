@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { 
     MapPin, Search, Coffee, Utensils, 
-    Star, ArrowLeft, KeyRound, Wifi, Copy, List, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation
+    Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
+    Plus, Minus, Menu
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
+import SettingsModal from "../components/SettingsModal";
 
 // Dynamically import the Map component with ssr: false
 const MapComponent = dynamic(() => import("../components/Map"), {
@@ -34,6 +37,11 @@ export default function Home() {
     const [isFetchingMap, setIsFetchingMap] = useState(false);
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [mapInstance, setMapInstance] = useState<any>(null);
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     // Initial mobile detection
     useEffect(() => {
@@ -155,9 +163,39 @@ export default function Home() {
                 <span className="text-sm font-medium">{toastMessage}</span>
             </div>
 
+            {/* Burger Menu */}
+            <div className="absolute top-4 right-4 z-[1000]">
+                <button
+                    onClick={() => setIsMenuOpen(!isMenuOpen)}
+                    className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center text-gray-700 hover:bg-gray-50 transition-colors border border-gray-100"
+                >
+                    <Menu size={20} />
+                </button>
+
+                {isMenuOpen && (
+                    <div className="absolute top-12 right-0 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 overflow-hidden flex flex-col">
+                        <Link href="/login" className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 text-left">
+                            Login
+                        </Link>
+                        <Link href="/register" className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 text-left">
+                            Register
+                        </Link>
+                        <button
+                            onClick={() => {
+                                setIsMenuOpen(false);
+                                setIsSettingsOpen(true);
+                            }}
+                            className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 text-left"
+                        >
+                            Settings
+                        </button>
+                    </div>
+                )}
+            </div>
+
             {/* Loading Map Indicator */}
             {isFetchingMap && !selectedId && (
-                <div className="fixed top-20 right-4 md:top-4 md:right-4 bg-white/90 backdrop-blur-sm shadow-md rounded-full px-4 py-2 flex items-center gap-2 z-[1000] animate-pulse border border-gray-100">
+                <div className="fixed top-20 right-4 md:top-4 md:right-20 bg-white/90 backdrop-blur-sm shadow-md rounded-full px-4 py-2 flex items-center gap-2 z-[1000] animate-pulse border border-gray-100">
                     <Loader2 size={16} className="text-amber-500 animate-spin" />
                     <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">Scanning Area</span>
                 </div>
@@ -307,6 +345,7 @@ export default function Home() {
                                 <input 
                                     type="text" 
                                     id="search-input" 
+                                    ref={searchInputRef}
                                     placeholder="Search cafes or restaurants..." 
                                     className="w-full bg-gray-100 border-none rounded-xl py-3 pl-10 pr-10 focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all outline-none"
                                     value={searchQuery} 
@@ -368,6 +407,7 @@ export default function Home() {
                     flyToLocation={flyToLocation}
                     onOsmPlacesFetch={setOsmPlaces}
                     setIsFetchingMap={setIsFetchingMap}
+                    onMapReady={setMapInstance}
                 />
                 
                 {/* Floating Map Controls */}
@@ -379,13 +419,37 @@ export default function Home() {
                     >
                         {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
                     </button>
+                    <button
+                        onClick={() => mapInstance?.zoomIn()}
+                        className="w-12 h-12 bg-white text-gray-700 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100"
+                        title="Zoom In"
+                    >
+                        <Plus size={20} />
+                    </button>
+                    <button
+                        onClick={() => mapInstance?.zoomOut()}
+                        className="w-12 h-12 bg-white text-gray-700 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-100"
+                        title="Zoom Out"
+                    >
+                        <Minus size={20} />
+                    </button>
                 </div>
 
                 {/* Mobile Open Panel Button (Visible when panel is closed on mobile) */}
                 {isMobile && !isMobilePanelOpen && !selectedId && (
-                    <button onClick={() => toggleMobilePanel()} className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[500] bg-white text-gray-800 px-6 py-3 rounded-full shadow-lg font-medium border border-gray-100 flex items-center gap-2 hover:bg-gray-50 whitespace-nowrap">
-                        <List size={18} className="text-amber-600" /> <span className="text-sm">Browse Places</span>
-                    </button>
+                    <div
+                        onClick={() => {
+                            toggleMobilePanel();
+                            // Focus search input after panel animation starts
+                            setTimeout(() => {
+                                searchInputRef.current?.focus();
+                            }, 300);
+                        }}
+                        className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-[500] bg-white text-gray-800 w-[90%] max-w-sm py-3 px-4 rounded-full shadow-lg border border-gray-100 flex items-center gap-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                    >
+                        <Search size={20} className="text-gray-400" />
+                        <span className="text-gray-400 text-sm font-medium">Search cafes or restaurants...</span>
+                    </div>
                 )}
             </div>
 
@@ -434,6 +498,8 @@ export default function Home() {
                     </div>
                 </div>
             )}
+
+            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
         </div>
     );
 }

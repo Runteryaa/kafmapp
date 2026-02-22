@@ -30,6 +30,7 @@ const MapEventsWrapper = dynamic(
   () => import('react-leaflet').then((mod) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return function MapEventsInner({ onZoomEnd, onMoveEnd, setMapRef }: any) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const map = mod.useMapEvents({
             zoomend: onZoomEnd,
             moveend: onMoveEnd
@@ -44,11 +45,13 @@ const MapEventsWrapper = dynamic(
 );
 
 export default function MapComponent({ 
-    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap
+    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap, onMapReady
 }: { 
     places: Place[], onSelect: (id: number) => void, selectedId: number | null, isMobile: boolean, 
     userLocation: LocationState | null, flyToLocation: LocationState | null,
-    onOsmPlacesFetch: (places: Place[]) => void, setIsFetchingMap: (b: boolean) => void
+    onOsmPlacesFetch: (places: Place[]) => void, setIsFetchingMap: (b: boolean) => void,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    onMapReady?: (map: any) => void
 }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [L, setL] = useState<any>(null);
@@ -70,6 +73,8 @@ export default function MapComponent({
   // Map Controller Effect
   useEffect(() => {
     if (!map) return;
+    if (onMapReady) onMapReady(map);
+
     if (flyToLocation) {
         map.setView([flyToLocation.lat, flyToLocation.lng], 15, { animate: true, duration: 1.5 });
     } else if (selectedPlace) {
@@ -78,7 +83,7 @@ export default function MapComponent({
     } else if (userLocation) {
         map.setView([userLocation.lat, userLocation.lng], 15, { animate: true });
     }
-  }, [map, flyToLocation, selectedPlace, isMobile, userLocation]);
+  }, [map, flyToLocation, selectedPlace, isMobile, userLocation, onMapReady]);
 
   // Overpass Fetcher
   const fetchPlaces = async () => {
@@ -154,6 +159,7 @@ export default function MapComponent({
       }
 
       try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const newPlaces: Place[] = data.elements
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               .filter((el: any) => el.tags?.name)

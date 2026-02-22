@@ -44,6 +44,25 @@ export default function Home() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
     const [language, setLanguage] = useState<'en' | 'es'>('en');
+    const [isThemeLoaded, setIsThemeLoaded] = useState(false);
+
+    // Load theme from local storage
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+        if (savedTheme) {
+            setTheme(savedTheme);
+        } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            setTheme('dark');
+        }
+        setIsThemeLoaded(true);
+    }, []);
+
+    // Save theme to local storage
+    useEffect(() => {
+        if (isThemeLoaded) {
+            localStorage.setItem('theme', theme);
+        }
+    }, [theme, isThemeLoaded]);
 
     // Initial mobile detection
     useEffect(() => {

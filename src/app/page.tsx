@@ -655,7 +655,6 @@ export default function Home() {
                                 )}
 
                                 {filteredPlaces.map(place => {
-                                    const hasData = place.toiletPass || place.menu.length > 0;
                                     const style = getPlaceStyle(place.type);
                                     const { Icon } = style;
 
@@ -671,32 +670,40 @@ export default function Home() {
                                             <div className="flex gap-3 mt-2 flex-wrap">
                                                 {place.rating > 0 && <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400"/> {place.rating}</span>}
 
-                                                {/* Toilet Status */}
-                                                {place.toiletPass === null || place.toiletPass === undefined ? (
-                                                     <span className="text-xs font-medium text-red-500 dark:text-red-400 flex items-center gap-1"><KeyRound size={12}/> No WC</span>
-                                                ) : (place.toiletPass === 'Free' || place.toiletPass === 'Open' || place.toiletPass === 'Ask to staff') ? (
-                                                     <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><KeyRound size={12}/> WC</span>
-                                                ) : (
-                                                     <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500 flex items-center gap-1"><KeyRound size={12}/> Code</span>
-                                                )}
+                                                {place.isRegistered ? (
+                                                    <>
+                                                        {/* Toilet Status */}
+                                                        {(() => {
+                                                            const pass = place.toiletPass;
+                                                            let colorClass = "text-yellow-600 dark:text-yellow-500"; // Default: Yellow (Code)
+                                                            if (pass === null) colorClass = "text-gray-400 dark:text-gray-500"; // Gray (Unknown)
+                                                            else if (pass === 'No' || pass === 'None') colorClass = "text-red-500 dark:text-red-400"; // Red (Absent)
+                                                            else if (pass === 'Free' || pass === 'Open' || pass === 'Ask to staff') colorClass = "text-green-600 dark:text-green-500"; // Green (Available)
 
-                                                {/* WiFi Status */}
-                                                {place.wifiPass === null || place.wifiPass === undefined ? (
-                                                     <span className="text-xs font-medium text-red-500 dark:text-red-400 flex items-center gap-1"><Wifi size={12}/> No Wifi</span>
-                                                ) : (place.wifiPass === 'Free' || place.wifiPass === 'Open' || place.wifiPass === 'Ask to staff') ? (
-                                                     <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Wifi size={12}/> Wifi</span>
-                                                ) : (
-                                                     <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500 flex items-center gap-1"><Wifi size={12}/> Code</span>
-                                                )}
+                                                            return <span className={`text-xs font-medium ${colorClass} flex items-center gap-1`}><KeyRound size={12}/> WC</span>
+                                                        })()}
 
-                                                {/* Menu Status */}
-                                                {place.menu.length > 0 ? (
-                                                    <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>
-                                                ) : (
-                                                    <span className="text-xs font-medium text-red-500 dark:text-red-400 flex items-center gap-1"><Utensils size={12}/> No Menu</span>
-                                                )}
+                                                        {/* WiFi Status */}
+                                                        {(() => {
+                                                            const pass = place.wifiPass;
+                                                            let colorClass = "text-yellow-600 dark:text-yellow-500"; // Default: Yellow (Code)
+                                                            if (pass === null) colorClass = "text-gray-400 dark:text-gray-500"; // Gray (Unknown)
+                                                            else if (pass === 'No' || pass === 'None') colorClass = "text-red-500 dark:text-red-400"; // Red (Absent)
+                                                            else if (pass === 'Free' || pass === 'Open' || pass === 'Ask to staff') colorClass = "text-green-600 dark:text-green-500"; // Green (Available)
 
-                                                {!hasData && <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">Unclaimed</span>}
+                                                            return <span className={`text-xs font-medium ${colorClass} flex items-center gap-1`}><Wifi size={12}/> Wifi</span>
+                                                        })()}
+
+                                                        {/* Menu Status */}
+                                                        {place.menu.length > 0 ? (
+                                                            <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>
+                                                        ) : (
+                                                            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">Unclaimed</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

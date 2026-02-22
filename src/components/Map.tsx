@@ -179,7 +179,8 @@ export default function MapComponent({
                       toiletPass: null, 
                       wifiPass: null, 
                       rating: 0, 
-                      menu: []
+                      menu: [],
+                      isRegistered: false
                   };
               });
           

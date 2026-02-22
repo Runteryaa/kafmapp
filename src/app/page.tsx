@@ -132,7 +132,6 @@ export default function Home() {
                 setIsLocating(false);
             }
         );
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Initial mobile detection
@@ -671,8 +670,32 @@ export default function Home() {
                                             
                                             <div className="flex gap-3 mt-2 flex-wrap">
                                                 {place.rating > 0 && <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400"/> {place.rating}</span>}
-                                                {place.toiletPass && <span className="text-xs font-medium text-blue-500 dark:text-blue-400 flex items-center gap-1"><KeyRound size={12}/> Code</span>}
-                                                {place.menu.length > 0 && <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>}
+
+                                                {/* Toilet Status */}
+                                                {place.toiletPass === null || place.toiletPass === undefined ? (
+                                                     <span className="text-xs font-medium text-red-500 dark:text-red-400 flex items-center gap-1"><KeyRound size={12}/> No WC</span>
+                                                ) : (place.toiletPass === 'Free' || place.toiletPass === 'Open' || place.toiletPass === 'Ask to staff') ? (
+                                                     <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><KeyRound size={12}/> WC</span>
+                                                ) : (
+                                                     <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500 flex items-center gap-1"><KeyRound size={12}/> Code</span>
+                                                )}
+
+                                                {/* WiFi Status */}
+                                                {place.wifiPass === null || place.wifiPass === undefined ? (
+                                                     <span className="text-xs font-medium text-red-500 dark:text-red-400 flex items-center gap-1"><Wifi size={12}/> No Wifi</span>
+                                                ) : (place.wifiPass === 'Free' || place.wifiPass === 'Open' || place.wifiPass === 'Ask to staff') ? (
+                                                     <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Wifi size={12}/> Wifi</span>
+                                                ) : (
+                                                     <span className="text-xs font-medium text-yellow-600 dark:text-yellow-500 flex items-center gap-1"><Wifi size={12}/> Code</span>
+                                                )}
+
+                                                {/* Menu Status */}
+                                                {place.menu.length > 0 ? (
+                                                    <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>
+                                                ) : (
+                                                    <span className="text-xs font-medium text-red-500 dark:text-red-400 flex items-center gap-1"><Utensils size={12}/> No Menu</span>
+                                                )}
+
                                                 {!hasData && <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">Unclaimed</span>}
                                             </div>
                                         </div>

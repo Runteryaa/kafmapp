@@ -212,7 +212,7 @@ export default function Home() {
     };
 
     return (
-        <div className={`flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans selection:bg-amber-200 relative ${theme === 'dark' ? 'dark' : ''}`}>
+        <div className={`flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 font-sans selection:bg-amber-200 relative ${theme === 'dark' ? 'dark' : ''}`}>
             
             {/* Burger Menu Button */}
             <button
@@ -378,7 +378,7 @@ export default function Home() {
                 </div>
 
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 bg-white dark:bg-gray-900">
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between shrink-0 bg-white dark:bg-gray-800">
                     <div className="flex items-center gap-2">
                         <div className="bg-amber-100 text-amber-700 p-2 rounded-lg">
                             <MapPin size={20} className="stroke-[2.5]" />
@@ -395,7 +395,7 @@ export default function Home() {
                 </div>
 
                 {/* Dynamic Content Area */}
-                <div className="flex-1 overflow-y-auto relative w-full h-full bg-white dark:bg-gray-900">
+                <div className="flex-1 overflow-y-auto relative w-full h-full bg-white dark:bg-gray-800">
                     {selectedPlace ? (
                         // --- DETAILS VIEW ---
                         <div className="animate-fade-in relative pb-8">
@@ -563,7 +563,7 @@ export default function Home() {
             </div>
 
             {/* Map Area */}
-            <div className="flex-1 w-full h-full z-0 relative bg-gray-100 dark:bg-gray-900">
+            <div className="flex-1 w-full h-full z-0 relative bg-gray-100 dark:bg-gray-800">
                 <MapComponent 
                     places={filteredPlaces} 
                     onSelect={handleSelect} 

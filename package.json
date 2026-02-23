@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@radix-ui/react-toast": "^1.2.15",
-    "appwrite": "^22.4.0",
+    "appwrite": "^22.4.1",
     "framer-motion": "^12.34.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.575.0",

@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
-import { client } from "../lib/appwrite"; // Import appwrite client
+import { UpdateInfoModal } from "../components/UpdateInfoModal"; // Import new modal
+import { client, databases } from "../lib/appwrite"; // Import appwrite client
 import { useAuth } from "../hooks/useAuth";
 
 // Dynamically import the Map component with ssr: false
@@ -78,6 +79,7 @@ export default function Home() {
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
     const [manualFetchTrigger, setManualFetchTrigger] = useState(0);
+    const [dbPlaces, setDbPlaces] = useState<Record<string, any>>({});
     
     // Use the useAuth hook for authentication
     const { user, logout } = useAuth();
@@ -98,6 +100,30 @@ export default function Home() {
     const [isThemeLoaded, setIsThemeLoaded] = useState(false);
     const [isLoginOpen, setIsLoginOpen] = useState(false);
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+    const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+
+    // Fetch places data from Appwrite DB
+    const fetchDbPlaces = async () => {
+        try {
+            const response = await databases.listDocuments('kafmap', 'places');
+            const placesMap: Record<string, any> = {};
+            response.documents.forEach(doc => {
+                placesMap[doc.placeId] = {
+                    toiletPass: doc.toiletPass,
+                    wifiPass: doc.wifiPass,
+                    menu: doc.menu ? JSON.parse(doc.menu) : []
+                };
+            });
+            setDbPlaces(placesMap);
+        } catch (error) {
+            console.error("Failed to fetch places from DB:", error);
+            // Ignore error if collection doesn't exist yet, it will be created
+        }
+    };
+
+    useEffect(() => {
+        fetchDbPlaces();
+    }, []);
 
     // Load theme from local storage
     useEffect(() => {
@@ -170,9 +196,20 @@ export default function Home() {
     }
 
 
-    // Combine local mock data with live OSM data
-    // OSM places that match a mock place by name (roughly) are ignored so mock data takes precedence
-    const combinedPlaces = [...mockPlaces, ...osmPlaces.filter(op => !mockPlaces.some(mp => mp.name.toLowerCase() === op.name.toLowerCase()))];
+    // Combine local mock data with live OSM data, then overlay DB data
+    const combinedPlaces = [...mockPlaces, ...osmPlaces.filter(op => !mockPlaces.some(mp => mp.name.toLowerCase() === op.name.toLowerCase()))].map(place => {
+        const dbData = dbPlaces[place.id.toString()];
+        if (dbData) {
+            return {
+                ...place,
+                toiletPass: dbData.toiletPass !== undefined ? dbData.toiletPass : place.toiletPass,
+                wifiPass: dbData.wifiPass !== undefined ? dbData.wifiPass : place.wifiPass,
+                menu: dbData.menu || place.menu,
+                isRegistered: true // If it's in DB, it has been interacted with
+            };
+        }
+        return place;
+    });
     
     // Filter by search
     const filteredPlaces = combinedPlaces.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -500,6 +537,17 @@ export default function Home() {
                 </div>
             )}
 
+            {/* Update Info Modal */}
+            <UpdateInfoModal 
+                isOpen={isUpdateModalOpen} 
+                onClose={() => setIsUpdateModalOpen(false)} 
+                place={selectedPlace || null}
+                onSuccess={() => {
+                    fetchDbPlaces(); // Refresh DB data
+                    showToast("Information updated successfully!");
+                }}
+            />
+
             {/* Toast Notification */}
             <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-[2000] flex items-center gap-2 transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 pointer-events-none translate-y-2'}`}>
                 <ShieldCheck size={18} className="text-green-400" />
@@ -671,7 +719,17 @@ export default function Home() {
                                 </div>
 
                                 {/* Action Button */}
-                                <button className="w-full mt-6 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2">
+                                <button 
+                                    onClick={() => {
+                                        if (!user) {
+                                            showToast("Please log in to update info");
+                                            setIsLoginOpen(true);
+                                        } else {
+                                            setIsUpdateModalOpen(true);
+                                        }
+                                    }}
+                                    className="w-full mt-6 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                >
                                     Update Info
                                 </button>
                             </div>

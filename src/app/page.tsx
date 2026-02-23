@@ -5,10 +5,12 @@ import dynamic from "next/dynamic";
 import { 
     MapPin, Search, Coffee, Utensils, Pizza, Beer,
     Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
-    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
+import { client } from "../lib/appwrite"; // Import appwrite client
+import { useAuth } from "../hooks/useAuth";
 
 // Dynamically import the Map component with ssr: false
 const MapComponent = dynamic(() => import("../components/Map"), {
@@ -76,6 +78,9 @@ export default function Home() {
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
     const [manualFetchTrigger, setManualFetchTrigger] = useState(0);
+    
+    // Use the useAuth hook for authentication
+    const { user, logout } = useAuth();
 
     // Panel drag state
     const [panelHeight, setPanelHeight] = useState(60); // vh
@@ -112,6 +117,25 @@ export default function Home() {
         }
     }, [theme, isThemeLoaded]);
 
+    // Verify Appwrite setup on load
+    useEffect(() => {
+        client.ping().then(() => {
+             console.log("Appwrite ping successful!");
+             // showToast("Appwrite setup verified.");
+        }).catch((err) => {
+             console.error("Appwrite ping failed:", err);
+             // showToast("Appwrite connection failed.");
+        });
+    }, []);
+
+    // Initial mobile detection
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        handleResize();
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+    
     // Auto-locate user on initial load
     useEffect(() => {
         if (!navigator.geolocation) return;
@@ -134,13 +158,17 @@ export default function Home() {
         );
     }, []);
 
-    // Initial mobile detection
-    useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth < 768);
-        handleResize();
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, []);
+    const handleLogout = async () => {
+        try {
+            await logout();
+            showToast("Logged out successfully");
+            setIsBurgerMenuOpen(false);
+        } catch (error) {
+            console.error("Logout failed", error);
+            showToast("Logout failed");
+        }
+    }
+
 
     // Combine local mock data with live OSM data
     // OSM places that match a mock place by name (roughly) are ignored so mock data takes precedence
@@ -313,7 +341,13 @@ export default function Home() {
                 onClick={() => setIsBurgerMenuOpen(!isBurgerMenuOpen)}
                 className="fixed top-4 right-4 z-[2000] bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
-                <Menu size={24} className="text-gray-700 dark:text-gray-200" />
+                {user ? (
+                     <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs uppercase">
+                         {user.name ? user.name.charAt(0) : <User size={14} />}
+                     </div>
+                ) : (
+                    <Menu size={24} className="text-gray-700 dark:text-gray-200" />
+                )}
             </button>
 
             {/* Burger Menu Popup */}
@@ -325,24 +359,42 @@ export default function Home() {
                     />
                     <div className="fixed top-16 right-4 z-[2000] bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 w-48 overflow-hidden animate-fade-in origin-top-right">
                         <div className="flex flex-col py-1">
-                            <button
-                                onClick={() => {
-                                    setIsLoginOpen(true);
-                                    setIsBurgerMenuOpen(false);
-                                }}
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
-                            >
-                                <LogIn size={18} className="text-gray-400" /> Login
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setIsRegisterOpen(true);
-                                    setIsBurgerMenuOpen(false);
-                                }}
-                                className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
-                            >
-                                <UserPlus size={18} className="text-gray-400" /> Register
-                            </button>
+                            {!user ? (
+                                <>
+                                    <button
+                                        onClick={() => {
+                                            setIsLoginOpen(true);
+                                            setIsBurgerMenuOpen(false);
+                                        }}
+                                        className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
+                                    >
+                                        <LogIn size={18} className="text-gray-400" /> Login
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsRegisterOpen(true);
+                                            setIsBurgerMenuOpen(false);
+                                        }}
+                                        className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
+                                    >
+                                        <UserPlus size={18} className="text-gray-400" /> Register
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 flex flex-col gap-1">
+                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Signed in as</span>
+                                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user.name || user.email}</span>
+                                    </div>
+                                    <button
+                                        onClick={handleLogout}
+                                        className="px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-sm font-medium text-red-600 dark:text-red-400 transition-colors w-full text-left"
+                                    >
+                                        <LogOut size={18} className="text-red-400" /> Logout
+                                    </button>
+                                </>
+                            )}
+                            
                             <div className="h-px bg-gray-100 dark:bg-gray-700 my-1" />
                             <button
                                 onClick={() => {

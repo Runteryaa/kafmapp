@@ -14,12 +14,13 @@ export interface Place {
   wifiPass: string | null;
   rating: number;
   menu: MenuItem[];
+  menuUrl?: string | null;
   isRegistered?: boolean;
 }
 
 export interface LocationState {
-    lat: number;
-    lng: number;
+  lat: number;
+  lng: number;
 }
 
 // Keeping mock data for now as fallback/hybrid usage until full DB fetch is implemented in page.tsx

@@ -2,28 +2,31 @@
 
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { 
+import {
     MapPin, Search, Coffee, Utensils, Pizza, Beer,
     Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
-    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
 import { UpdateInfoModal } from "../components/UpdateInfoModal"; // Import new modal
+import ReportModal from "../components/ReportModal"; // Import report modal
 import { client, databases } from "../lib/appwrite"; // Import appwrite client
+import { ID, Query } from "appwrite"; // Import appwrite ID and Query
 import { useAuth } from "../hooks/useAuth";
+import { getTranslation } from "../lib/translations";
 
 // Dynamically import the Map component with ssr: false
 const MapComponent = dynamic(() => import("../components/Map"), {
-  ssr: false,
-  loading: () => (
-    <div className="absolute inset-0 flex items-center justify-center bg-gray-50 animate-pulse">
-      <div className="flex flex-col items-center gap-4 text-gray-400">
-        <MapIcon size={48} className="animate-bounce" />
-        <p className="text-xl font-medium tracking-tight">Loading map...</p>
-      </div>
-    </div>
-  ),
+    ssr: false,
+    loading: () => (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50 animate-pulse">
+            <div className="flex flex-col items-center gap-4 text-gray-400">
+                <MapIcon size={48} className="animate-bounce" />
+                <p className="text-xl font-medium tracking-tight">Loading map...</p>
+            </div>
+        </div>
+    ),
 });
 
 const getPlaceStyle = (type: string) => {
@@ -37,7 +40,7 @@ const getPlaceStyle = (type: string) => {
                 textHoverClass: 'group-hover:text-amber-700 dark:group-hover:text-amber-500'
             };
         case 'fast_food':
-             return {
+            return {
                 Icon: Pizza,
                 bgClass: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-500',
                 gradientClass: 'from-red-500 to-red-600',
@@ -46,7 +49,7 @@ const getPlaceStyle = (type: string) => {
             };
         case 'bar':
         case 'pub':
-             return {
+            return {
                 Icon: Beer,
                 bgClass: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-500',
                 gradientClass: 'from-purple-500 to-purple-600',
@@ -55,7 +58,7 @@ const getPlaceStyle = (type: string) => {
             };
         case 'restaurant':
         default:
-             return {
+            return {
                 Icon: Utensils,
                 bgClass: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500',
                 gradientClass: 'from-orange-500 to-red-500',
@@ -66,6 +69,8 @@ const getPlaceStyle = (type: string) => {
 };
 
 export default function Home() {
+    const [language, setLanguage] = useState<'tr' | 'en'>('tr');
+    const t = getTranslation(language);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [isMobilePanelOpen, setIsMobilePanelOpen] = useState(false);
@@ -79,10 +84,10 @@ export default function Home() {
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
     const [manualFetchTrigger, setManualFetchTrigger] = useState(0);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const [dbPlaces, setDbPlaces] = useState<Place[]>([]);
     const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
-    
+
     // Use the useAuth hook for authentication
     const { user, logout } = useAuth();
 
@@ -98,11 +103,32 @@ export default function Home() {
     const [isBurgerMenuOpen, setIsBurgerMenuOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [language, setLanguage] = useState<'en' | 'es'>('en');
     const [isThemeLoaded, setIsThemeLoaded] = useState(false);
     const [isLoginOpen, setIsLoginOpen] = useState(false);
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState<string | null>(null);
+    const [placeReports, setPlaceReports] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (selectedId) {
+            databases.listDocuments('kafmap', 'pending_updates', [
+                Query.equal('placeId', selectedId.toString()),
+                Query.equal('type', 'report')
+            ]).then(res => {
+                setPlaceReports(res.documents);
+            }).catch(err => {
+                console.error("Failed to fetch reports", err);
+            });
+        } else {
+            setPlaceReports([]);
+        }
+    }, [selectedId]);
+
+    const hasReport = (code: string) => placeReports.some(r => {
+        try { return JSON.parse(r.payload).reasonCode === code; } catch { return false; }
+    });
 
     // Fetch places data from Appwrite DB and construct full Place objects
     const fetchDbPlaces = async () => {
@@ -111,14 +137,15 @@ export default function Home() {
             const placesList: Place[] = response.documents.map((doc: any) => ({
                 id: parseInt(doc.placeId),
                 name: doc.name,
-                lat: doc.lat || 0, // Fallback if missing, though modal now saves them
-                lng: doc.lng || 0,
+                lat: doc.lat ? parseFloat(doc.lat.toString()) : 0, // Explicitly parse float for coordinates
+                lng: doc.lng ? parseFloat(doc.lng.toString()) : 0,
                 type: doc.type || 'restaurant',
                 address: doc.address || '',
                 toiletPass: doc.toiletPass,
                 wifiPass: doc.wifiPass,
+                menuUrl: doc.menuUrl || null,
                 // Calculate average rating from ratingSum and ratingCount
-                rating: doc.ratingCount > 0 ? doc.ratingSum / doc.ratingCount : 0, 
+                rating: Number(doc.ratingCount) > 0 ? Number(doc.ratingSum) / Number(doc.ratingCount) : 0,
                 menu: doc.menu ? JSON.parse(doc.menu) : [],
                 isRegistered: true
             }));
@@ -153,11 +180,11 @@ export default function Home() {
     // Verify Appwrite setup on load
     useEffect(() => {
         client.ping().then(() => {
-             console.log("Appwrite ping successful!");
-             // showToast("Appwrite setup verified.");
+            console.log("Appwrite ping successful!");
+            // showToast("Appwrite setup verified.");
         }).catch((err) => {
-             console.error("Appwrite ping failed:", err);
-             // showToast("Appwrite connection failed.");
+            console.error("Appwrite ping failed:", err);
+            // showToast("Appwrite connection failed.");
         });
     }, []);
 
@@ -168,7 +195,7 @@ export default function Home() {
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
     }, []);
-    
+
     // Auto-locate user on initial load
     useEffect(() => {
         if (!navigator.geolocation) return;
@@ -204,12 +231,19 @@ export default function Home() {
 
     const handleRatePlace = async (ratingValue: number) => {
         if (!user) {
-            showToast("Please log in to rate this place");
+            showToast(t.loginToRate);
             setIsLoginOpen(true);
             return;
         }
 
         if (!selectedPlace) return;
+
+        // Block multiple ratings locally per user
+        const ratedKey = `rated_place_${selectedPlace.id}_user_${user.$id}`;
+        if (localStorage.getItem(ratedKey)) {
+            showToast(t.alreadyRated);
+            return;
+        }
 
         setIsRatingSubmitting(true);
         const docId = `place_${selectedPlace.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
@@ -218,12 +252,12 @@ export default function Home() {
             // First, check if the place exists in DB
             try {
                 const doc = await databases.getDocument('kafmap', 'places', docId);
-                
+
                 // Place exists, update rating
                 // Note: This is a simple implementation. A robust one would store individual user ratings in a sub-collection
                 // to prevent multiple votes per user, but for now we'll just increment sum/count on the place doc.
-                const currentSum = doc.ratingSum || 0;
-                const currentCount = doc.ratingCount || 0;
+                const currentSum = doc.ratingSum ? Number(doc.ratingSum) : 0;
+                const currentCount = doc.ratingCount ? Number(doc.ratingCount) : 0;
 
                 await databases.updateDocument('kafmap', 'places', docId, {
                     ratingSum: (currentSum + ratingValue).toString(),
@@ -236,26 +270,34 @@ export default function Home() {
                     await databases.createDocument('kafmap', 'places', docId, {
                         placeId: selectedPlace.id.toString(),
                         name: selectedPlace.name,
-                        lat: selectedPlace.lat,
-                        lng: selectedPlace.lng,
+                        lat: selectedPlace.lat.toString(),
+                        lng: selectedPlace.lng.toString(),
                         type: selectedPlace.type,
                         address: selectedPlace.address,
-                        ratingSum: ratingValue,
-                        ratingCount: 1
+                        ratingSum: ratingValue.toString(),
+                        ratingCount: "1"
                     });
                 } else {
                     throw err;
                 }
             }
-            
-            showToast("Rating submitted!");
+
+            // After a successful operation, set the local flag to prevent multiple spam ratings
+            localStorage.setItem(ratedKey, "true");
+
+            showToast(t.ratingSubmitted);
             fetchDbPlaces(); // Refresh local data
         } catch (err) {
             console.error("Rating failed", err);
-            showToast("Failed to submit rating");
+            showToast(t.failedRating);
         } finally {
             setIsRatingSubmitting(false);
         }
+    };
+
+    const handleReportPlace = () => {
+        if (!selectedPlace) return;
+        setIsReportModalOpen(true);
     };
 
 
@@ -265,7 +307,7 @@ export default function Home() {
     // This ensures that if a place is in the DB, we show THAT version (which has passwords/menu), 
     // regardless of whether it is currently visible on the map or not.
     // The MapComponent will still fetch OSM data based on view, but we prioritize our DB data.
-    
+
     const combinedPlacesMap = new Map<number, Place>();
 
     // First add all DB places (they persist globally in the app state)
@@ -276,15 +318,18 @@ export default function Home() {
         if (!combinedPlacesMap.has(p.id)) {
             combinedPlacesMap.set(p.id, p);
         } else {
-            // Optional: Update coordinates from OSM if strictly needed, 
-            // but usually DB is the "source of truth" for metadata. 
-            // If we want to keep OSM's fresh rating/address but DB's passwords, we'd merge here.
-            // For now, let's assume DB has the user-verified state.
+            // DB places might have missing coordinates (0, 0) if saved before schema updates.
+            // If the live OSM node gives us real coordinates, patch the DB entry dynamically so it isn't orphaned off the coast of Africa!
+            const existingDbPlace = combinedPlacesMap.get(p.id)!;
+            if (!existingDbPlace.lat || existingDbPlace.lat === 0 || !existingDbPlace.lng || existingDbPlace.lng === 0) {
+                existingDbPlace.lat = p.lat;
+                existingDbPlace.lng = p.lng;
+            }
         }
     });
 
     const combinedPlaces = Array.from(combinedPlacesMap.values());
-    
+
     // Filter by search
     const filteredPlaces = combinedPlaces.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     const selectedPlace = combinedPlaces.find(p => p.id === selectedId);
@@ -295,13 +340,13 @@ export default function Home() {
     const handleSelect = (id: number) => {
         setSelectedId(id);
         const place = combinedPlaces.find(p => p.id === id);
-        
+
         // If the place is far away (e.g. from search result not in view), fly to it
         if (place) {
-             // Only fly if we are not already very close
-             setFlyToLocation({ lat: place.lat, lng: place.lng });
+            // Only fly if we are not already very close
+            setFlyToLocation({ lat: place.lat, lng: place.lng });
         }
-        
+
         if (isMobile && !isMobilePanelOpen) {
             setIsMobilePanelOpen(true);
         }
@@ -345,7 +390,7 @@ export default function Home() {
                 setUserLocation(newLocation);
                 setFlyToLocation(newLocation);
                 setIsLocating(false);
-                setSelectedId(null); 
+                setSelectedId(null);
                 showToast("Location updated");
             },
             () => {
@@ -417,8 +462,8 @@ export default function Home() {
     const handleGlobalSearch = async (e: React.KeyboardEvent<HTMLInputElement> | React.ChangeEvent<HTMLInputElement>) => {
         // Just standard search filtering if it's a typing event
         if ('target' in e && !('key' in e)) {
-             setSearchQuery((e.target as HTMLInputElement).value);
-             return;
+            setSearchQuery((e.target as HTMLInputElement).value);
+            return;
         }
 
         // Only do full geocoding search on enter press
@@ -431,13 +476,13 @@ export default function Home() {
                 if (data && data.length > 0) {
                     const lat = parseFloat(data[0].lat);
                     const lon = parseFloat(data[0].lon);
-                    
+
                     setFlyToLocation({ lat, lng: lon });
                     setSelectedId(null);
                     showToast(`Moved to ${data[0].display_name.split(',')[0]}`);
-                    
+
                     if (isMobile) {
-                         setIsMobilePanelOpen(false);
+                        setIsMobilePanelOpen(false);
                     }
                 } else {
                     showToast("Location not found");
@@ -453,16 +498,16 @@ export default function Home() {
 
     return (
         <div className={`flex flex-col md:flex-row h-[100dvh] w-screen overflow-hidden bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-100 font-sans selection:bg-amber-200 relative ${theme === 'dark' ? 'dark' : ''}`}>
-            
+
             {/* Burger Menu Button */}
             <button
                 onClick={() => setIsBurgerMenuOpen(!isBurgerMenuOpen)}
                 className="fixed top-4 right-4 z-[2000] bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
                 {user ? (
-                     <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs uppercase">
-                         {user.name ? user.name.charAt(0) : <User size={14} />}
-                     </div>
+                    <div className="w-6 h-6 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-bold text-xs uppercase">
+                        {user.name ? user.name.charAt(0) : <User size={14} />}
+                    </div>
                 ) : (
                     <Menu size={24} className="text-gray-700 dark:text-gray-200" />
                 )}
@@ -500,8 +545,8 @@ export default function Home() {
                                 </>
                             ) : (
                                 <>
-                                    <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900/50 flex flex-col gap-1">
-                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Signed in as</span>
+                                    <div className="px-4 py-3 bg-gray-100 dark:bg-gray-900/50 flex flex-col gap-1">
+                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{t.signedInAs}</span>
                                         <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{user.name || user.email}</span>
                                     </div>
                                     <button
@@ -512,7 +557,7 @@ export default function Home() {
                                     </button>
                                 </>
                             )}
-                            
+
                             <div className="h-px bg-gray-100 dark:bg-gray-700 my-1" />
                             <button
                                 onClick={() => {
@@ -555,7 +600,7 @@ export default function Home() {
                     />
                     <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in">
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                            <h3 className="font-bold text-lg text-gray-900 dark:text-white">Settings</h3>
+                            <h3 className="font-bold text-lg text-gray-900 dark:text-white">{t.settings}</h3>
                             <button
                                 onClick={() => setIsSettingsOpen(false)}
                                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -592,16 +637,16 @@ export default function Home() {
                                 </label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
+                                        onClick={() => setLanguage('tr')}
+                                        className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'tr' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
+                                    >
+                                        Turkish
+                                    </button>
+                                    <button
                                         onClick={() => setLanguage('en')}
                                         className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'en' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
                                     >
                                         English
-                                    </button>
-                                    <button
-                                        onClick={() => setLanguage('es')}
-                                        className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'es' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
-                                    >
-                                        Español
                                     </button>
                                 </div>
                             </div>
@@ -619,13 +664,13 @@ export default function Home() {
             )}
 
             {/* Update Info Modal */}
-            <UpdateInfoModal 
-                isOpen={isUpdateModalOpen} 
-                onClose={() => setIsUpdateModalOpen(false)} 
+            <UpdateInfoModal
+                isOpen={isUpdateModalOpen}
+                onClose={() => setIsUpdateModalOpen(false)}
                 place={selectedPlace || null}
                 onSuccess={() => {
                     fetchDbPlaces(); // Refresh DB data
-                    showToast("Information updated successfully!");
+                    showToast("Changes submitted for admin approval!");
                 }}
             />
 
@@ -639,12 +684,12 @@ export default function Home() {
             {isFetchingMap && !selectedId && (
                 <div className="fixed top-20 right-4 md:top-4 md:right-4 bg-white/90 backdrop-blur-sm shadow-md rounded-full px-4 py-2 flex items-center gap-2 z-[1000] animate-pulse border border-gray-100">
                     <Loader2 size={16} className="text-amber-500 animate-spin" />
-                    <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">Scanning Area</span>
+                    <span className="text-xs font-bold text-gray-600 uppercase tracking-widest">{t.scanningArea}</span>
                 </div>
             )}
 
             {/* Sidebar / Details Panel */}
-            <div 
+            <div
                 className={`absolute bottom-0 left-0 w-full md:h-full md:w-96 md:relative bg-white dark:bg-gray-900 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-xl z-[1000] flex flex-col transform transition-transform duration-300 ease-in-out rounded-t-3xl md:rounded-none ${isMobile && !isMobilePanelOpen && !selectedId ? 'translate-y-full' : 'translate-y-0'}`}
                 style={{
                     height: isMobile ? `${panelHeight}vh` : '100%',
@@ -685,7 +730,7 @@ export default function Home() {
                         </h1>
                     </div>
                     {isMobile && (
-                        <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" onClick={() => {setIsMobilePanelOpen(false); setSelectedId(null);}}>
+                        <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" onClick={() => { setIsMobilePanelOpen(false); setSelectedId(null); }}>
                             <X size={20} />
                         </button>
                     )}
@@ -697,171 +742,205 @@ export default function Home() {
                         const style = getPlaceStyle(selectedPlace.type);
                         const { Icon } = style;
                         return (
-                        // --- DETAILS VIEW ---
-                        <div className="animate-fade-in relative pb-8">
-                            {/* Header Image area (gradient placeholder) */}
-                            <div className={`h-32 bg-gradient-to-r relative ${style.gradientClass}`}>
-                                <button onClick={handleClearSelection} className="absolute top-4 left-4 bg-white/20 hover:bg-white/40 backdrop-blur text-white w-8 h-8 rounded-full flex items-center justify-center transition-colors">
-                                    <ArrowLeft size={16} />
-                                </button>
-                                {/* Tag if it's live data without details */}
-                                {!selectedPlace.toiletPass && selectedPlace.menu.length === 0 && (
-                                     <div className="absolute top-4 right-4 bg-black/30 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full border border-white/20">
-                                         Unclaimed
-                                     </div>
-                                )}
-                            </div>
-                            
-                            <div className="px-6 pb-6 relative -mt-6">
-                                {/* Floating Icon */}
-                                <div className="w-14 h-14 bg-white dark:bg-gray-800 rounded-full p-1 shadow-lg flex items-center justify-center mb-3">
-                                    <div className={`w-full h-full rounded-full flex items-center justify-center ${style.bgClass}`}>
-                                        <Icon size={24} />
-                                    </div>
-                                </div>
-
-                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight pr-2">{selectedPlace.name}</h2>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5 line-clamp-2"><MapPin size={14} className="shrink-0"/> {selectedPlace.address}</p>
-                                
-                                {/* Star Rating Display */}
-                                <div className="flex items-center gap-1 mt-2">
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                        <button 
-                                            key={star} 
-                                            disabled={isRatingSubmitting}
-                                            onClick={() => handleRatePlace(star)}
-                                            className="focus:outline-none transform hover:scale-110 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <Star 
-                                                size={16} 
-                                                className={`${star <= Math.round(selectedPlace.rating || 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 hover:fill-yellow-400'}`} 
-                                            />
-                                        </button>
-                                    ))}
-                                    <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">
-                                        {selectedPlace.rating ? selectedPlace.rating.toFixed(1) : "No ratings"}
-                                    </span>
-                                </div>
-
-                                {/* Passwords Grid */}
-                                <div className="grid grid-cols-2 gap-3 mt-6">
-                                    {/* Toilet Code */}
-                                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 relative overflow-hidden group">
-                                        <div className="absolute -right-4 -top-4 text-blue-100 dark:text-blue-800/20 opacity-50 transform group-hover:scale-110 transition-transform duration-300 pointer-events-none">
-                                            <KeyRound size={80} />
-                                        </div>
-                                        <div className="relative z-10">
-                                            <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide mb-1">Toilet Code</p>
-                                            <div className="flex items-center justify-between h-8">
-                                                {selectedPlace.toiletPass ? (
-                                                    <p className="text-lg font-mono font-bold text-gray-900 dark:text-white tracking-tight">{selectedPlace.toiletPass}</p>
-                                                ) : (
-                                                    <p className="text-sm font-semibold text-gray-400 italic">N/A</p>
-                                                )}
-                                                {selectedPlace.toiletPass && selectedPlace.toiletPass !== 'Ask to staff' && (
-                                                    <button onClick={() => handleCopy(selectedPlace.toiletPass!)} className="text-blue-500 hover:text-blue-700 bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:text-blue-300 rounded-md p-1.5 shadow-sm transition-colors" title="Copy">
-                                                        <Copy size={16} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* WiFi */}
-                                    <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 relative overflow-hidden group">
-                                        <div className="absolute -right-4 -top-4 text-green-100 dark:text-green-800/20 opacity-50 transform group-hover:scale-110 transition-transform duration-300 pointer-events-none">
-                                            <Wifi size={80} />
-                                        </div>
-                                        <div className="relative z-10">
-                                            <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide mb-1">Free WiFi</p>
-                                            <div className="flex items-center justify-between h-8">
-                                                {selectedPlace.wifiPass ? (
-                                                    <p className="text-sm font-mono font-bold text-gray-900 dark:text-white truncate pr-2">{selectedPlace.wifiPass}</p>
-                                                ) : (
-                                                    <p className="text-sm font-semibold text-gray-400 italic">No WiFi</p>
-                                                )}
-                                                {selectedPlace.wifiPass && (
-                                                    <button onClick={() => handleCopy(selectedPlace.wifiPass!)} className="text-green-600 hover:text-green-800 bg-white dark:bg-gray-800 dark:text-green-400 dark:hover:text-green-300 rounded-md p-1.5 shadow-sm transition-colors" title="Copy">
-                                                        <Copy size={16} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Menu Section (Snippet) */}
-                                <div className="mt-8">
+                            // --- DETAILS VIEW ---
+                            <div className="animate-fade-in relative pb-8 pt-6">
+                                <div className="px-6 pb-6">
+                                    {/* Header Controls */}
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">Menu Snippet</h3>
-                                        <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-md">Last updated today</span>
-                                    </div>
-                                    <div className={`bg-white dark:bg-gray-800 border rounded-xl shadow-sm ${selectedPlace.menu.length > 0 ? 'border-gray-100 dark:border-gray-700 p-4' : 'border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 p-6 flex flex-col items-center justify-center text-center'}`}>
-                                        {selectedPlace.menu.length > 0 ? (
-                                            <div className="space-y-0">
-                                                {selectedPlace.menu.slice(0, 3).map((item, idx) => (
-                                                    <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-700 last:border-0">
-                                                        <span className="text-gray-700 dark:text-gray-300">{item.item}</span>
-                                                        <span className="font-semibold text-gray-900 dark:text-white">{item.price}</span>
-                                                    </div>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={handleClearSelection} className="bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0">
+                                                <ArrowLeft size={16} />
+                                            </button>
+                                            <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shrink-0 ${style.bgClass}`}>
+                                                <Icon size={24} className="sm:w-7 sm:h-7" />
+                                            </div>
+
+                                            {/* Star Rating Display */}
+                                            <div className="flex items-center gap-0.5 sm:gap-1 ml-1 sm:ml-2">
+                                                {[1, 2, 3, 4, 5].map((star) => (
+                                                    <button
+                                                        key={star}
+                                                        disabled={isRatingSubmitting}
+                                                        onClick={() => handleRatePlace(star)}
+                                                        className="focus:outline-none transform hover:scale-110 transition-transform disabled:opacity-50 disabled:cursor-not-allowed leading-none flex items-center justify-center"
+                                                    >
+                                                        <Star
+                                                            size={16}
+                                                            className={`w-4 h-4 sm:w-5 sm:h-5 ${star <= Math.round(selectedPlace.rating || 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 hover:fill-yellow-400'}`}
+                                                        />
+                                                    </button>
                                                 ))}
-                                                {selectedPlace.menu.length > 3 && (
-                                                    <div className="pt-3 text-center border-t border-gray-50 dark:border-gray-700 mt-2">
-                                                        <button onClick={() => setIsMenuFullscreen(true)} className="text-xs font-semibold text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 flex items-center justify-center gap-1 w-full">
-                                                            <Maximize2 size={12} /> See all {selectedPlace.menu.length} items
+                                                <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 ml-1 font-medium">
+                                                    {selectedPlace.rating ? selectedPlace.rating.toFixed(1) : t.new}
+                                                </span>
+                                                <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
+                                                <button onClick={handleReportPlace} className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full dark:hover:bg-red-900/20 hover:bg-red-50" title="Report inaccurate info">
+                                                    <Flag size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight pr-2">{selectedPlace.name}</h2>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5 line-clamp-2"><MapPin size={14} className="shrink-0" /> {selectedPlace.address}</p>
+
+                                    {/* Passwords Grid */}
+                                    <div className="grid grid-cols-2 gap-3 mt-6">
+                                        {/* Toilet Code */}
+                                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 relative overflow-hidden group">
+                                            <div className="absolute -right-4 -top-4 text-blue-100 dark:text-blue-800/20 opacity-50 transform group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+                                                <KeyRound size={80} />
+                                            </div>
+                                            <div className="relative z-10">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">{t.toiletCode}</p>
+                                                    {hasReport('wcPasswordIncorrect') && (
+                                                        <button
+                                                            onClick={() => setAlertMessage(t.flagTooltip.replace('{reason}', t.wcPasswordIncorrect.toLowerCase()))}
+                                                            className="relative flex items-center justify-center cursor-pointer ml-1.5 transition-transform hover:scale-110"
+                                                            title={t.flagTooltip.replace('{reason}', t.wcPasswordIncorrect)}
+                                                        >
+                                                            <div className="flex bg-red-100 dark:bg-red-900/30 p-1 rounded-full ring-1 ring-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.4)]">
+                                                                <AlertTriangle size={14} className="text-red-500 animate-pulse" />
+                                                            </div>
                                                         </button>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center justify-between h-8">
+                                                    {selectedPlace.toiletPass ? (
+                                                        <p className="text-lg font-mono font-bold text-gray-900 dark:text-white tracking-tight">{selectedPlace.toiletPass}</p>
+                                                    ) : (
+                                                        <p className="text-sm font-semibold text-gray-400 italic">N/A</p>
+                                                    )}
+                                                    {selectedPlace.toiletPass && selectedPlace.toiletPass !== 'Ask to staff' && (
+                                                        <button onClick={() => handleCopy(selectedPlace.toiletPass!)} className="text-blue-500 hover:text-blue-700 bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:text-blue-300 rounded-md p-1.5 shadow-sm transition-colors" title="Copy">
+                                                            <Copy size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* WiFi */}
+                                        <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 relative overflow-hidden group">
+                                            <div className="absolute -right-4 -top-4 text-green-100 dark:text-green-800/20 opacity-50 transform group-hover:scale-110 transition-transform duration-300 pointer-events-none">
+                                                <Wifi size={80} />
+                                            </div>
+                                            <div className="relative z-10">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide">{t.freeWifi}</p>
+                                                    {hasReport('wifiPasswordIncorrect') && (
+                                                        <button
+                                                            onClick={() => setAlertMessage(t.flagTooltip.replace('{reason}', t.wifiPasswordIncorrect.toLowerCase()))}
+                                                            className="relative flex items-center justify-center cursor-pointer ml-1.5 transition-transform hover:scale-110"
+                                                            title={t.flagTooltip.replace('{reason}', t.wifiPasswordIncorrect)}
+                                                        >
+                                                            <div className="flex bg-red-100 dark:bg-red-900/30 p-1 rounded-full ring-1 ring-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.4)]">
+                                                                <AlertTriangle size={14} className="text-red-500 animate-pulse" />
+                                                            </div>
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center justify-between h-8">
+                                                    {selectedPlace.wifiPass ? (
+                                                        <p className="text-sm font-mono font-bold text-gray-900 dark:text-white truncate pr-2">{selectedPlace.wifiPass}</p>
+                                                    ) : (
+                                                        <p className="text-sm font-semibold text-gray-400 italic">{t.noWifi}</p>
+                                                    )}
+                                                    {selectedPlace.wifiPass && (
+                                                        <button onClick={() => handleCopy(selectedPlace.wifiPass!)} className="text-green-600 hover:text-green-800 bg-white dark:bg-gray-800 dark:text-green-400 dark:hover:text-green-300 rounded-md p-1.5 shadow-sm transition-colors" title="Copy">
+                                                            <Copy size={16} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Menu Section (Snippet) */}
+                                    <div className="mt-8">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">{t.menuSnippet}</h3>
+                                            <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-md">{t.lastUpdatedToday}</span>
+                                        </div>
+                                        {selectedPlace.menuUrl ? (
+                                            <a
+                                                href={selectedPlace.menuUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-medium py-4 rounded-xl transition-colors flex items-center justify-center gap-2 border border-blue-100 dark:border-blue-800"
+                                            >
+                                                <ExternalLink size={18} />
+                                                Open Full Online Menu
+                                            </a>
+                                        ) : (
+                                            <div className={`bg-white dark:bg-gray-800 border rounded-xl shadow-sm ${selectedPlace.menu.length > 0 ? 'border-gray-100 dark:border-gray-700 p-4' : 'border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 p-6 flex flex-col items-center justify-center text-center'}`}>
+                                                {selectedPlace.menu.length > 0 ? (
+                                                    <div className="space-y-0">
+                                                        {selectedPlace.menu.slice(0, 3).map((item, idx) => (
+                                                            <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-700 last:border-0">
+                                                                <span className="text-gray-700 dark:text-gray-300">{item.item}</span>
+                                                                <span className="font-semibold text-gray-900 dark:text-white">{item.price}</span>
+                                                            </div>
+                                                        ))}
+                                                        {selectedPlace.menu.length > 3 && (
+                                                            <div className="pt-3 text-center border-t border-gray-50 dark:border-gray-700 mt-2">
+                                                                <button onClick={() => setIsMenuFullscreen(true)} className="text-xs font-semibold text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 flex items-center justify-center gap-1 w-full">
+                                                                    <Maximize2 size={12} /> See all {selectedPlace.menu.length} items
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">{t.noMenuPrices}</p>
                                                 )}
                                             </div>
-                                        ) : (
-                                            <p className="text-sm text-gray-500 dark:text-gray-400">No menu prices submitted yet.</p>
                                         )}
                                     </div>
-                                </div>
 
-                                {/* Action Button */}
-                                <button 
-                                    onClick={() => {
-                                        if (!user) {
-                                            showToast("Please log in to update info");
-                                            setIsLoginOpen(true);
-                                        } else {
-                                            setIsUpdateModalOpen(true);
-                                        }
-                                    }}
-                                    className="w-full mt-6 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-                                >
-                                    Update Info
-                                </button>
+                                    {/* Action Button */}
+                                    <button
+                                        onClick={() => {
+                                            if (!user) {
+                                                showToast(t.loginToUpdate);
+                                                setIsLoginOpen(true);
+                                            } else {
+                                                setIsUpdateModalOpen(true);
+                                            }
+                                        }}
+                                        className="w-full mt-6 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        Update Info
+                                    </button>
+                                </div>
                             </div>
-                        </div>
                         );
                     })() : (
                         // --- LIST VIEW ---
                         <div className="p-6">
                             <div className="relative mb-6">
-                                <input 
-                                    type="text" 
-                                    id="search-input" 
-                                    placeholder="Search cafes or restaurants..." 
-                                    className="w-full bg-gray-100 dark:bg-gray-800 dark:text-white border-none rounded-xl py-3 pl-10 pr-10 focus:ring-2 focus:ring-amber-500 focus:bg-white dark:focus:bg-gray-700 transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                                    value={searchQuery} 
+                                <input
+                                    type="text"
+                                    id="search-input"
+                                    placeholder={t.searchPlaceholder}
+                                    className="w-full bg-gray-100 dark:bg-gray-900/50 dark:text-white border-none rounded-xl py-3 pl-10 pr-10 focus:ring-2 focus:ring-amber-500 focus:bg-white dark:focus:bg-gray-700 transition-all outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                                    value={searchQuery}
                                     onChange={handleGlobalSearch}
                                     onKeyDown={handleGlobalSearch}
                                 />
                                 <Search className="absolute left-4 top-3.5 text-gray-400" size={18} />
                                 {isSearchingCity && <Loader2 className="absolute right-4 top-3.5 text-amber-500 animate-spin" size={18} />}
                             </div>
-                            
+
                             <h2 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-4 flex items-center justify-between">
-                                Nearby Places
+                                {t.nearbyPlaces}
                             </h2>
-                            
+
                             <div className="space-y-3 pb-8">
                                 {filteredPlaces.length === 0 && !isFetchingMap && (
                                     <div className="text-center text-gray-500 dark:text-gray-400 py-8">
                                         <MapIcon size={24} className="mx-auto mb-2 text-gray-400 dark:text-gray-600" />
-                                        No places found.
+                                        {t.noPlacesFound}
                                     </div>
                                 )}
 
@@ -870,55 +949,56 @@ export default function Home() {
                                     const { Icon } = style;
 
                                     return (
-                                    <div key={place.id} onClick={() => handleSelect(place.id)} className={`group cursor-pointer bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 transition-all flex items-start gap-4 hover:shadow-md ${style.borderHoverClass}`}>
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${style.bgClass}`}>
-                                            <Icon size={18} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className={`font-semibold text-gray-900 dark:text-gray-100 truncate transition-colors pr-2 ${style.textHoverClass}`}>{place.name}</h3>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{place.address}</p>
-                                            
-                                            <div className="flex gap-3 mt-2 flex-wrap">
-                                                {place.rating > 0 && <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400"/> {place.rating.toFixed(1)}</span>}
+                                        <div key={place.id} onClick={() => handleSelect(place.id)} className={`group cursor-pointer bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl p-4 transition-all flex items-start gap-4 hover:shadow-md ${style.borderHoverClass}`}>
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${place.isRegistered ? style.bgClass : 'bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500'}`}>
+                                                <Icon size={18} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className={`font-semibold text-gray-900 dark:text-gray-100 truncate transition-colors pr-2 ${style.textHoverClass}`}>{place.name}</h3>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{place.address}</p>
 
-                                                {place.isRegistered ? (
-                                                    <>
-                                                        {/* Toilet Status */}
-                                                        {(() => {
-                                                            const pass = place.toiletPass;
-                                                            let colorClass = "text-yellow-600 dark:text-yellow-500"; // Default: Yellow (Code)
-                                                            if (pass === null) colorClass = "text-gray-400 dark:text-gray-500"; // Gray (Unknown)
-                                                            else if (pass === 'No' || pass === 'None') colorClass = "text-red-500 dark:text-red-400"; // Red (Absent)
-                                                            else if (pass === 'Free' || pass === 'Open' || pass === 'Ask to staff') colorClass = "text-green-600 dark:text-green-500"; // Green (Available)
+                                                <div className="flex gap-3 mt-2 flex-wrap">
+                                                    {place.rating > 0 && <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400" /> {place.rating.toFixed(1)}</span>}
 
-                                                            return <span className={`text-xs font-medium ${colorClass} flex items-center gap-1`}><KeyRound size={12}/> WC</span>
-                                                        })()}
+                                                    {place.isRegistered ? (
+                                                        <>
+                                                            {/* Toilet Status */}
+                                                            {(() => {
+                                                                const pass = place.toiletPass;
+                                                                let colorClass = "text-yellow-600 dark:text-yellow-500"; // Default: Yellow (Code)
+                                                                if (pass === null) colorClass = "text-gray-400 dark:text-gray-500"; // Gray (Unknown)
+                                                                else if (pass === 'No' || pass === 'None') colorClass = "text-red-500 dark:text-red-400"; // Red (Absent)
+                                                                else if (pass === 'free' || pass === 'ücretsiz' || pass === 'ucretsiz' || pass === 'Free' || pass === 'Ücretsiz' || pass === 'Ucretsiz') colorClass = "text-green-600 dark:text-green-500"; // Green (Available)
 
-                                                        {/* WiFi Status */}
-                                                        {(() => {
-                                                            const pass = place.wifiPass;
-                                                            let colorClass = "text-yellow-600 dark:text-yellow-500"; // Default: Yellow (Code)
-                                                            if (pass === null) colorClass = "text-gray-400 dark:text-gray-500"; // Gray (Unknown)
-                                                            else if (pass === 'No' || pass === 'None') colorClass = "text-red-500 dark:text-red-400"; // Red (Absent)
-                                                            else if (pass === 'Free' || pass === 'Open' || pass === 'Ask to staff') colorClass = "text-green-600 dark:text-green-500"; // Green (Available)
+                                                                return <span className={`text-xs font-medium ${colorClass} flex items-center gap-1`}><KeyRound size={12} /> WC</span>
+                                                            })()}
 
-                                                            return <span className={`text-xs font-medium ${colorClass} flex items-center gap-1`}><Wifi size={12}/> Wifi</span>
-                                                        })()}
+                                                            {/* WiFi Status */}
+                                                            {(() => {
+                                                                const pass = place.wifiPass;
+                                                                let colorClass = "text-yellow-600 dark:text-yellow-500"; // Default: Yellow (Code)
+                                                                if (pass === null) colorClass = "text-gray-400 dark:text-gray-500"; // Gray (Unknown)
+                                                                else if (pass === 'No' || pass === 'None') colorClass = "text-red-500 dark:text-red-400"; // Red (Absent)
+                                                                else if (pass === 'Free' || pass === 'Open' || pass === 'Ask to staff') colorClass = "text-green-600 dark:text-green-500"; // Green (Available)
 
-                                                        {/* Menu Status */}
-                                                        {place.menu.length > 0 ? (
-                                                            <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>
-                                                        ) : (
-                                                            <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1"><Utensils size={12}/> Menu</span>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">Unclaimed</span>
-                                                )}
+                                                                return <span className={`text-xs font-medium ${colorClass} flex items-center gap-1`}><Wifi size={12} /> Wifi</span>
+                                                            })()}
+
+                                                            {/* Menu Status */}
+                                                            {place.menu.length > 0 ? (
+                                                                <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12} /> Menu</span>
+                                                            ) : (
+                                                                <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1"><Utensils size={12} /> Menu</span>
+                                                            )}
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">{t.unclaimed}</span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )})}
+                                    )
+                                })}
                             </div>
                         </div>
                     )}
@@ -927,12 +1007,12 @@ export default function Home() {
 
             {/* Map Area */}
             <div className="flex-1 w-full h-full z-0 relative bg-gray-100 dark:bg-gray-800">
-                <MapComponent 
-                    places={filteredPlaces} 
-                    onSelect={handleSelect} 
-                    selectedId={selectedId} 
-                    isMobile={isMobile} 
-                    userLocation={userLocation} 
+                <MapComponent
+                    places={filteredPlaces}
+                    onSelect={handleSelect}
+                    selectedId={selectedId}
+                    isMobile={isMobile}
+                    userLocation={userLocation}
                     flyToLocation={flyToLocation}
                     onOsmPlacesFetch={setOsmPlaces}
                     setIsFetchingMap={setIsFetchingMap}
@@ -940,7 +1020,7 @@ export default function Home() {
                     theme={theme}
                     manualTrigger={manualFetchTrigger}
                 />
-                
+
                 {/* Floating Map Controls - Zoom Buttons (Left) */}
                 <div className={`absolute left-6 z-[500] flex flex-col gap-3 transition-all duration-300 ${isMobileSearchVisible ? 'bottom-24' : 'bottom-6'}`}>
                     <button
@@ -1003,50 +1083,86 @@ export default function Home() {
                 const { Icon } = style;
 
                 return (
-                <div className="fixed inset-0 z-[3000] bg-white dark:bg-gray-900 flex flex-col animate-fade-in overflow-hidden">
-                    {/* Modal Header */}
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
-                        <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${style.bgClass}`}>
-                                <Icon size={20} />
+                    <div className="fixed inset-0 z-[3000] bg-white dark:bg-gray-900 flex flex-col animate-fade-in overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${style.bgClass}`}>
+                                    <Icon size={20} />
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight truncate">{selectedPlace.name}</h2>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Full Menu</p>
+                                </div>
                             </div>
-                            <div className="min-w-0">
-                                <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight truncate">{selectedPlace.name}</h2>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Full Menu</p>
-                            </div>
+                            <button
+                                onClick={() => setIsMenuFullscreen(false)}
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors shrink-0"
+                            >
+                                <X size={24} />
+                            </button>
                         </div>
-                        <button 
-                            onClick={() => setIsMenuFullscreen(false)}
-                            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors shrink-0"
-                        >
-                            <X size={24} />
-                        </button>
-                    </div>
 
-                    {/* Modal Content (Scrollable List) */}
-                    <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-gray-900">
-                        <div className="max-w-2xl mx-auto">
-                            <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden divide-y divide-gray-50 dark:divide-gray-700">
-                                {selectedPlace.menu.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-center p-4">
-                                        <div className="flex-1 pr-4">
-                                            <h4 className="text-base text-gray-800 dark:text-gray-200 font-medium">{item.item}</h4>
+                        {/* Modal Content (Scrollable List) */}
+                        <div className="flex-1 overflow-y-auto p-6 bg-white dark:bg-gray-900">
+                            <div className="max-w-2xl mx-auto">
+                                <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden divide-y divide-gray-50 dark:divide-gray-700">
+                                    {selectedPlace.menu.map((item, idx) => (
+                                        <div key={idx} className="flex justify-between items-center p-4">
+                                            <div className="flex-1 pr-4">
+                                                <h4 className="text-base text-gray-800 dark:text-gray-200 font-medium">{item.item}</h4>
+                                            </div>
+                                            <div className="shrink-0 flex items-center">
+                                                <span className="text-base font-semibold text-gray-900 dark:text-white">{item.price}</span>
+                                            </div>
                                         </div>
-                                        <div className="shrink-0 flex items-center">
-                                            <span className="text-base font-semibold text-gray-900 dark:text-white">{item.price}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="text-center mt-6 mb-8 flex flex-col items-center gap-2">
-                                <ShieldCheck size={20} className="text-gray-300 dark:text-gray-600" />
-                                <p className="text-xs text-gray-400 dark:text-gray-500">Prices are user-submitted and may not be 100% accurate or up-to-date.</p>
+                                    ))}
+                                </div>
+                                <div className="text-center mt-6 mb-8 flex flex-col items-center gap-2">
+                                    <ShieldCheck size={20} className="text-gray-300 dark:text-gray-600" />
+                                    <p className="text-xs text-gray-400 dark:text-gray-500">Prices are user-submitted and may not be 100% accurate or up-to-date.</p>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
                 );
             })()}
+            {/* Report Modal */}
+            <ReportModal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                place={selectedPlace || null}
+                t={t}
+                onSuccess={() => {
+                    showToast(t.reportSubmitted);
+                    // Manually fetch reports to update UI instantly without needing a full reload
+                    if (selectedId) {
+                        databases.listDocuments('kafmap', 'pending_updates', [
+                            Query.equal('placeId', selectedId.toString()),
+                            Query.equal('type', 'report')
+                        ]).then(res => setPlaceReports(res.documents));
+                    }
+                }}
+            />
+
+            {/* Custom Alert Modal */}
+            {alertMessage && (
+                <div className="fixed inset-0 z-[7000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setAlertMessage(null)}>
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-sm shadow-2xl p-8 transform transition-all text-center border border-red-100 dark:border-red-900/30" onClick={e => e.stopPropagation()}>
+                        <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-5 ring-4 ring-red-50 dark:ring-red-900/20">
+                            <AlertTriangle size={32} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Attention</h3>
+                        <p className="text-base text-gray-600 dark:text-gray-300 mb-8 font-medium">{alertMessage}</p>
+                        <button
+                            onClick={() => setAlertMessage(null)}
+                            className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3.5 rounded-xl transition-colors shadow-md shadow-red-500/20"
+                        >
+                            Understood
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

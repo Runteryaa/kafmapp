@@ -1,22 +1,24 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Loader2, Save } from 'lucide-react';
+import { X, Plus, Trash2, Loader2, Save, Link } from 'lucide-react';
 import { databases } from '../lib/appwrite';
 import { Place } from '../lib/types';
+import { ID } from 'appwrite';
 
-export function UpdateInfoModal({ 
-    isOpen, 
-    onClose, 
-    place, 
-    onSuccess 
-}: { 
-    isOpen: boolean; 
-    onClose: () => void; 
-    place: Place | null; 
-    onSuccess: () => void; 
+export function UpdateInfoModal({
+    isOpen,
+    onClose,
+    place,
+    onSuccess
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    place: Place | null;
+    onSuccess: () => void;
 }) {
     const [toiletPass, setToiletPass] = useState("");
     const [wifiPass, setWifiPass] = useState("");
-    const [menu, setMenu] = useState<{item: string, price: string}[]>([{item: '', price: ''}]);
+    const [menu, setMenu] = useState<{ item: string, price: string }[]>([{ item: '', price: '' }]);
+    const [menuUrl, setMenuUrl] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -24,7 +26,8 @@ export function UpdateInfoModal({
         if (place) {
             setToiletPass(place.toiletPass || '');
             setWifiPass(place.wifiPass || '');
-            setMenu(place.menu && place.menu.length > 0 ? place.menu : [{item: '', price: ''}]);
+            setMenuUrl(place.menuUrl || '');
+            setMenu(place.menu && place.menu.length > 0 ? place.menu : [{ item: '', price: '' }]);
         }
     }, [place]);
 
@@ -41,29 +44,25 @@ export function UpdateInfoModal({
         const payload: any = {
             placeId: place.id.toString(),
             name: place.name,
-            lat: place.lat,
-            lng: place.lng,
+            lat: place.lat.toString(),
+            lng: place.lng.toString(),
             type: place.type,
             address: place.address,
             toiletPass: toiletPass.trim() || null,
             wifiPass: wifiPass.trim() || null,
+            menuUrl: menuUrl.trim() || null,
             menu: JSON.stringify(filteredMenu),
         };
 
-        const docId = `place_${place.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
-
         try {
-            try {
-                // Try to update existing document first
-                await databases.updateDocument('kafmap', 'places', docId, payload);
-            } catch (updateErr: any) {
-                // If it doesn't exist (404), create a new one
-                if (updateErr.code === 404) {
-                    await databases.createDocument('kafmap', 'places', docId, payload);
-                } else {
-                    throw updateErr;
-                }
-            }
+            // Submit changes to the pending_updates collection for admin approval
+            await databases.createDocument('kafmap', 'pending_updates', ID.unique(), {
+                placeId: place.id.toString(),
+                placeName: place.name,
+                type: 'update',
+                payload: JSON.stringify(payload)
+            });
+
             onSuccess();
             onClose();
         } catch (err: any) {
@@ -80,7 +79,7 @@ export function UpdateInfoModal({
         setMenu(newMenu);
     };
 
-    const addMenuItem = () => setMenu([...menu, {item: '', price: ''}]);
+    const addMenuItem = () => setMenu([...menu, { item: '', price: '' }]);
     const removeMenuItem = (index: number) => setMenu(menu.filter((_, i) => i !== index));
 
     return (
@@ -131,6 +130,19 @@ export function UpdateInfoModal({
                             </div>
                         </div>
 
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
+                                <Link size={14} /> Full Menu URL (Optional)
+                            </label>
+                            <input
+                                type="url"
+                                value={menuUrl}
+                                onChange={(e) => setMenuUrl(e.target.value)}
+                                placeholder="https://example.com/menu"
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:bg-gray-700 dark:text-white text-sm"
+                            />
+                        </div>
+
                         <div className="border-t border-gray-100 dark:border-gray-700 pt-6">
                             <div className="flex items-center justify-between mb-4">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -140,7 +152,7 @@ export function UpdateInfoModal({
                                     <Plus size={14} /> Add Item
                                 </button>
                             </div>
-                            
+
                             <div className="space-y-3">
                                 {menu.map((m, idx) => (
                                     <div key={idx} className="flex gap-2 items-start">
@@ -162,8 +174,8 @@ export function UpdateInfoModal({
                                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:bg-gray-700 dark:text-white text-sm"
                                             />
                                         </div>
-                                        <button 
-                                            type="button" 
+                                        <button
+                                            type="button"
                                             onClick={() => removeMenuItem(idx)}
                                             className="p-2.5 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors shrink-0"
                                         >
@@ -196,7 +208,7 @@ export function UpdateInfoModal({
                         className="px-5 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 dark:disabled:bg-amber-800 rounded-xl transition-colors flex items-center gap-2 shadow-sm"
                     >
                         {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        Save Changes
+                        Submit for Approval
                     </button>
                 </div>
             </div>

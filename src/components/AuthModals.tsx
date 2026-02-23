@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { translations } from "../lib/translations";
 
-export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: boolean, onClose: () => void, onSwitchToRegister: () => void }) {
+type TranslationType = typeof translations.en;
+
+export function LoginModal({ isOpen, onClose, onSwitchToRegister, t }: { isOpen: boolean, onClose: () => void, onSwitchToRegister: () => void, t: TranslationType }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +37,13 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
                 onClick={onClose}
                 className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-colors flex items-center gap-2"
              >
-                <ArrowLeft size={20} /> <span className="font-medium">Back to Map</span>
+                <ArrowLeft size={20} /> <span className="font-medium">{t.backToMap}</span>
             </button>
         </div>
 
         <div className="sm:mx-auto sm:w-full sm:max-w-md mt-12">
             <h2 className="text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-            Sign in to your account
+            {t.signInTitle}
             </h2>
         </div>
 
@@ -54,7 +57,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
                 )}
                 <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Email address
+                    {t.emailAddress}
                 </label>
                 <div className="mt-1">
                     <input
@@ -72,7 +75,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
 
                 <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Password
+                    {t.password}
                 </label>
                 <div className="mt-1">
                     <input
@@ -97,13 +100,13 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
                     className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
                     />
                     <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-                    Remember me
+                    {t.rememberMe}
                     </label>
                 </div>
 
                 <div className="text-sm">
                     <a href="#" className="font-medium text-amber-600 hover:text-amber-500 dark:text-amber-500 dark:hover:text-amber-400">
-                    Forgot your password?
+                    {t.forgotPassword}
                     </a>
                 </div>
                 </div>
@@ -114,7 +117,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
                     disabled={isLoading}
                     className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors disabled:opacity-70"
                 >
-                    {isLoading ? <Loader2 size={18} className="animate-spin" /> : "Sign in"}
+                    {isLoading ? <Loader2 size={18} className="animate-spin" /> : t.signInButton}
                 </button>
                 </div>
             </form>
@@ -125,7 +128,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
                     <div className="w-full border-t border-gray-300 dark:border-gray-600" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or continue with</span>
+                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">{t.orContinueWith}</span>
                 </div>
                 </div>
 
@@ -153,16 +156,16 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
                             fill="#EA4335"
                         />
                     </svg>
-                    Sign in with Google
+                    {t.signInWithGoogle}
                     </button>
                 </div>
             </div>
 
             <div className="mt-6 text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                Don&apos;t have an account?{' '}
+                {t.dontHaveAccount}{' '}
                 <button onClick={onSwitchToRegister} className="font-medium text-amber-600 hover:text-amber-500 dark:text-amber-500 dark:hover:text-amber-400">
-                    Register
+                    {t.register}
                 </button>
                 </p>
             </div>
@@ -173,7 +176,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister }: { isOpen: bo
   );
 }
 
-export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: boolean, onClose: () => void, onSwitchToLogin: () => void }) {
+export function RegisterModal({ isOpen, onClose, onSwitchToLogin, t }: { isOpen: boolean, onClose: () => void, onSwitchToLogin: () => void, t: TranslationType }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -207,13 +210,13 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
                 onClick={onClose}
                 className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 transition-colors flex items-center gap-2"
              >
-                <ArrowLeft size={20} /> <span className="font-medium">Back to Map</span>
+                <ArrowLeft size={20} /> <span className="font-medium">{t.backToMap}</span>
             </button>
         </div>
 
         <div className="sm:mx-auto sm:w-full sm:max-w-md mt-12">
             <h2 className="text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-            Create a new account
+            {t.createAccountTitle}
             </h2>
         </div>
 
@@ -227,7 +230,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
                 )}
                 <div>
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Full Name
+                    {t.fullName}
                 </label>
                 <div className="mt-1">
                     <input
@@ -245,7 +248,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
 
                 <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Email address
+                    {t.emailAddress}
                 </label>
                 <div className="mt-1">
                     <input
@@ -263,7 +266,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
 
                 <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Password (min. 8 characters)
+                    {t.passwordMinChars}
                 </label>
                 <div className="mt-1">
                     <input
@@ -286,7 +289,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
                     disabled={isLoading}
                     className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors disabled:opacity-70"
                 >
-                     {isLoading ? <Loader2 size={18} className="animate-spin" /> : "Sign up"}
+                     {isLoading ? <Loader2 size={18} className="animate-spin" /> : t.signUpButton}
                 </button>
                 </div>
             </form>
@@ -297,7 +300,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
                     <div className="w-full border-t border-gray-300 dark:border-gray-600" />
                 </div>
                 <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or register with</span>
+                    <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">{t.orRegisterWith}</span>
                 </div>
                 </div>
 
@@ -325,16 +328,16 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin }: { isOpen: bo
                             fill="#EA4335"
                         />
                     </svg>
-                    Sign in with Google
+                    {t.signInWithGoogle}
                     </button>
                 </div>
             </div>
 
             <div className="mt-6 text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                Already have an account?{' '}
+                {t.alreadyHaveAccount}{' '}
                 <button onClick={onSwitchToLogin} className="font-medium text-amber-600 hover:text-amber-500 dark:text-amber-500 dark:hover:text-amber-400">
-                    Sign in
+                    {t.login}
                 </button>
                 </p>
             </div>

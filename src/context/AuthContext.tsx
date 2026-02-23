@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { account } from '../lib/appwrite';
-import { ID, Models } from 'appwrite';
+import { ID, Models, OAuthProvider } from 'appwrite';
 
 interface AuthContextType {
     user: Models.User<Models.Preferences> | null;
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const loginWithGoogle = () => {
          // Redirect back to the current page after OAuth
          account.createOAuth2Session(
-            'google',
+            OAuthProvider.Google,
             window.location.href,
             window.location.href
         );

@@ -79,7 +79,9 @@ export default function Home() {
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
     const [manualFetchTrigger, setManualFetchTrigger] = useState(0);
-    const [dbPlaces, setDbPlaces] = useState<Record<string, any>>({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [dbPlaces, setDbPlaces] = useState<Place[]>([]);
+    const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
     
     // Use the useAuth hook for authentication
     const { user, logout } = useAuth();
@@ -102,22 +104,27 @@ export default function Home() {
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
 
-    // Fetch places data from Appwrite DB
+    // Fetch places data from Appwrite DB and construct full Place objects
     const fetchDbPlaces = async () => {
         try {
             const response = await databases.listDocuments('kafmap', 'places');
-            const placesMap: Record<string, any> = {};
-            response.documents.forEach(doc => {
-                placesMap[doc.placeId] = {
-                    toiletPass: doc.toiletPass,
-                    wifiPass: doc.wifiPass,
-                    menu: doc.menu ? JSON.parse(doc.menu) : []
-                };
-            });
-            setDbPlaces(placesMap);
+            const placesList: Place[] = response.documents.map((doc: any) => ({
+                id: parseInt(doc.placeId),
+                name: doc.name,
+                lat: doc.lat || 0, // Fallback if missing, though modal now saves them
+                lng: doc.lng || 0,
+                type: doc.type || 'restaurant',
+                address: doc.address || '',
+                toiletPass: doc.toiletPass,
+                wifiPass: doc.wifiPass,
+                // Calculate average rating from ratingSum and ratingCount
+                rating: doc.ratingCount > 0 ? doc.ratingSum / doc.ratingCount : 0, 
+                menu: doc.menu ? JSON.parse(doc.menu) : [],
+                isRegistered: true
+            }));
+            setDbPlaces(placesList);
         } catch (error) {
             console.error("Failed to fetch places from DB:", error);
-            // Ignore error if collection doesn't exist yet, it will be created
         }
     };
 
@@ -195,21 +202,88 @@ export default function Home() {
         }
     }
 
-
-    // Combine local mock data with live OSM data, then overlay DB data
-    const combinedPlaces = [...mockPlaces, ...osmPlaces.filter(op => !mockPlaces.some(mp => mp.name.toLowerCase() === op.name.toLowerCase()))].map(place => {
-        const dbData = dbPlaces[place.id.toString()];
-        if (dbData) {
-            return {
-                ...place,
-                toiletPass: dbData.toiletPass !== undefined ? dbData.toiletPass : place.toiletPass,
-                wifiPass: dbData.wifiPass !== undefined ? dbData.wifiPass : place.wifiPass,
-                menu: dbData.menu || place.menu,
-                isRegistered: true // If it's in DB, it has been interacted with
-            };
+    const handleRatePlace = async (ratingValue: number) => {
+        if (!user) {
+            showToast("Please log in to rate this place");
+            setIsLoginOpen(true);
+            return;
         }
-        return place;
+
+        if (!selectedPlace) return;
+
+        setIsRatingSubmitting(true);
+        const docId = `place_${selectedPlace.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+
+        try {
+            // First, check if the place exists in DB
+            try {
+                const doc = await databases.getDocument('kafmap', 'places', docId);
+                
+                // Place exists, update rating
+                // Note: This is a simple implementation. A robust one would store individual user ratings in a sub-collection
+                // to prevent multiple votes per user, but for now we'll just increment sum/count on the place doc.
+                const currentSum = doc.ratingSum || 0;
+                const currentCount = doc.ratingCount || 0;
+
+                await databases.updateDocument('kafmap', 'places', docId, {
+                    ratingSum: currentSum + ratingValue,
+                    ratingCount: currentCount + 1
+                });
+
+            } catch (err: any) {
+                // If it doesn't exist (404), create a new one with initial rating
+                if (err.code === 404) {
+                    await databases.createDocument('kafmap', 'places', docId, {
+                        placeId: selectedPlace.id.toString(),
+                        name: selectedPlace.name,
+                        lat: selectedPlace.lat,
+                        lng: selectedPlace.lng,
+                        type: selectedPlace.type,
+                        address: selectedPlace.address,
+                        ratingSum: ratingValue,
+                        ratingCount: 1
+                    });
+                } else {
+                    throw err;
+                }
+            }
+            
+            showToast("Rating submitted!");
+            fetchDbPlaces(); // Refresh local data
+        } catch (err) {
+            console.error("Rating failed", err);
+            showToast("Failed to submit rating");
+        } finally {
+            setIsRatingSubmitting(false);
+        }
+    };
+
+
+    // Merge Strategies:
+    // 1. Start with DB places (these are "registered" and have rich data)
+    // 2. Add OSM places ONLY if they are NOT already in the DB list (by ID)
+    // This ensures that if a place is in the DB, we show THAT version (which has passwords/menu), 
+    // regardless of whether it is currently visible on the map or not.
+    // The MapComponent will still fetch OSM data based on view, but we prioritize our DB data.
+    
+    const combinedPlacesMap = new Map<number, Place>();
+
+    // First add all DB places (they persist globally in the app state)
+    dbPlaces.forEach(p => combinedPlacesMap.set(p.id, p));
+
+    // Then add OSM places if they don't exist in the map
+    osmPlaces.forEach(p => {
+        if (!combinedPlacesMap.has(p.id)) {
+            combinedPlacesMap.set(p.id, p);
+        } else {
+            // Optional: Update coordinates from OSM if strictly needed, 
+            // but usually DB is the "source of truth" for metadata. 
+            // If we want to keep OSM's fresh rating/address but DB's passwords, we'd merge here.
+            // For now, let's assume DB has the user-verified state.
+        }
     });
+
+    const combinedPlaces = Array.from(combinedPlacesMap.values());
     
     // Filter by search
     const filteredPlaces = combinedPlaces.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -220,7 +294,14 @@ export default function Home() {
     // Actions
     const handleSelect = (id: number) => {
         setSelectedId(id);
-        setFlyToLocation(null); // Clear flyTo when selecting a specific place so MapController handles centering
+        const place = combinedPlaces.find(p => p.id === id);
+        
+        // If the place is far away (e.g. from search result not in view), fly to it
+        if (place) {
+             // Only fly if we are not already very close
+             setFlyToLocation({ lat: place.lat, lng: place.lng });
+        }
+        
         if (isMobile && !isMobilePanelOpen) {
             setIsMobilePanelOpen(true);
         }
@@ -641,6 +722,26 @@ export default function Home() {
 
                                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight pr-2">{selectedPlace.name}</h2>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1.5 line-clamp-2"><MapPin size={14} className="shrink-0"/> {selectedPlace.address}</p>
+                                
+                                {/* Star Rating Display */}
+                                <div className="flex items-center gap-1 mt-2">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button 
+                                            key={star} 
+                                            disabled={isRatingSubmitting}
+                                            onClick={() => handleRatePlace(star)}
+                                            className="focus:outline-none transform hover:scale-110 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Star 
+                                                size={16} 
+                                                className={`${star <= Math.round(selectedPlace.rating || 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300 dark:text-gray-600 hover:text-yellow-400 hover:fill-yellow-400'}`} 
+                                            />
+                                        </button>
+                                    ))}
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">
+                                        {selectedPlace.rating ? selectedPlace.rating.toFixed(1) : "No ratings"}
+                                    </span>
+                                </div>
 
                                 {/* Passwords Grid */}
                                 <div className="grid grid-cols-2 gap-3 mt-6">
@@ -778,7 +879,7 @@ export default function Home() {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{place.address}</p>
                                             
                                             <div className="flex gap-3 mt-2 flex-wrap">
-                                                {place.rating > 0 && <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400"/> {place.rating}</span>}
+                                                {place.rating > 0 && <span className="text-xs font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1"><Star size={12} className="text-yellow-400 fill-yellow-400"/> {place.rating.toFixed(1)}</span>}
 
                                                 {place.isRegistered ? (
                                                     <>

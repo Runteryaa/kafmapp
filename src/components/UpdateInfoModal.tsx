@@ -37,12 +37,17 @@ export function UpdateInfoModal({
 
         const filteredMenu = menu.filter(m => m.item.trim() !== '' && m.price.trim() !== '');
 
-        const payload = {
+        // Construct the base payload
+        const payload: any = {
             placeId: place.id.toString(),
             name: place.name,
+            lat: place.lat,
+            lng: place.lng,
+            type: place.type,
+            address: place.address,
             toiletPass: toiletPass.trim() || null,
             wifiPass: wifiPass.trim() || null,
-            menu: JSON.stringify(filteredMenu)
+            menu: JSON.stringify(filteredMenu),
         };
 
         const docId = `place_${place.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);

@@ -226,8 +226,8 @@ export default function Home() {
                 const currentCount = doc.ratingCount || 0;
 
                 await databases.updateDocument('kafmap', 'places', docId, {
-                    ratingSum: currentSum + ratingValue,
-                    ratingCount: currentCount + 1
+                    ratingSum: (currentSum + ratingValue).toString(),
+                    ratingCount: (currentCount + 1).toString()
                 });
 
             } catch (err: any) {

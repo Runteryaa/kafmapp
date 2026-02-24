@@ -7,12 +7,12 @@ import {
     Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
     Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle
 } from "lucide-react";
-import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
+import { LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
 import { UpdateInfoModal } from "../components/UpdateInfoModal"; // Import new modal
 import ReportModal from "../components/ReportModal"; // Import report modal
 import { client, databases } from "../lib/appwrite"; // Import appwrite client
-import { ID, Query } from "appwrite"; // Import appwrite ID and Query
+import { Query } from "appwrite"; // Import appwrite ID and Query
 import { useAuth } from "../hooks/useAuth";
 import { getTranslation } from "../lib/translations";
 
@@ -1021,8 +1021,15 @@ export default function Home() {
                     manualTrigger={manualFetchTrigger}
                 />
 
-                {/* Floating Map Controls - Zoom Buttons (Left) */}
+                {/* Floating Map Controls - Left Side (Locate Me + Zoom) */}
                 <div className={`absolute left-6 z-[500] flex flex-col gap-3 transition-all duration-300 ${isMobileSearchVisible ? 'bottom-24' : 'bottom-6'}`}>
+                    <button
+                        onClick={handleLocateMe}
+                        className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isLocating ? 'animate-pulse text-blue-500' : ''}`}
+                        title="Locate Me"
+                    >
+                        {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
+                    </button>
                     <button
                         onClick={handleZoomIn}
                         className="w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
@@ -1039,15 +1046,8 @@ export default function Home() {
                     </button>
                 </div>
 
-                {/* Floating Map Controls - Locate Me Button (Right) */}
+                {/* Floating Map Controls - Right Side (Scan Area) */}
                 <div className={`absolute right-6 z-[500] flex flex-col gap-3 transition-all duration-300 ${isMobileSearchVisible ? 'bottom-24' : 'bottom-6'}`}>
-                    <button
-                        onClick={handleLocateMe}
-                        className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isLocating ? 'animate-pulse text-blue-500' : ''}`}
-                        title="Locate Me"
-                    >
-                        {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
-                    </button>
                     <button
                         onClick={() => setManualFetchTrigger(Date.now())}
                         className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isFetchingMap ? 'text-amber-500' : ''}`}

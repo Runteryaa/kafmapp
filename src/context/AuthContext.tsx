@@ -11,6 +11,7 @@ interface AuthContextType {
     logout: () => Promise<void>;
     register: (email: string, password: string, name?: string) => Promise<void>;
     checkUserStatus: () => Promise<void>;
+    loginWithGoogle: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const loggedInUser = await account.get();
             setUser(loggedInUser);
         } catch (error) {
+            console.error("User status check failed", error);
             setUser(null);
         } finally {
             setLoading(false);
@@ -49,8 +51,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await login(email, password);
     };
 
+    const loginWithGoogle = () => {
+        const redirectUrl = typeof window !== 'undefined' ? window.location.href : '';
+        account.createOAuth2Session(
+            'google',
+            redirectUrl,
+            redirectUrl
+        );
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, register, checkUserStatus }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, register, checkUserStatus, loginWithGoogle }}>
             {children}
         </AuthContext.Provider>
     );

@@ -11,6 +11,7 @@ interface AuthContextType {
     logout: () => Promise<void>;
     register: (email: string, password: string, name?: string) => Promise<void>;
     checkUserStatus: () => Promise<void>;
+    loginWithGoogle: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,8 +50,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await login(email, password);
     };
 
+    const loginWithGoogle = () => {
+        const redirectUrl = typeof window !== 'undefined' ? window.location.href : '';
+        // Redirects to Google OAuth
+        account.createOAuth2Session(
+            'google',
+            redirectUrl, // Success URL (current page)
+            redirectUrl  // Failure URL
+        );
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, register, checkUserStatus }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, register, checkUserStatus, loginWithGoogle }}>
             {children}
         </AuthContext.Provider>
     );

@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import {
     MapPin, Search, Coffee, Utensils, Pizza, Beer,
     Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
-    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle, Download
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
@@ -110,6 +110,27 @@ export default function Home() {
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
     const [placeReports, setPlaceReports] = useState<any[]>([]);
+    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker
+                .register('/sw.js')
+                .then((registration) => console.log('Service Worker registered with scope:', registration.scope))
+                .catch((error) => console.error('Service Worker registration failed:', error));
+        }
+
+        const handleBeforeInstallPrompt = (e: any) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+        };
+
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        };
+    }, []);
 
     useEffect(() => {
         if (selectedId) {
@@ -298,6 +319,15 @@ export default function Home() {
     const handleReportPlace = () => {
         if (!selectedPlace) return;
         setIsReportModalOpen(true);
+    };
+
+    const handleInstallClick = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setDeferredPrompt(null);
+        }
     };
 
 
@@ -609,6 +639,22 @@ export default function Home() {
                             </button>
                         </div>
                         <div className="p-6 space-y-6">
+                            {/* Install App Option (Only visible if installable) */}
+                            {deferredPrompt && (
+                                <div className="pb-6 border-b border-gray-100 dark:border-gray-700">
+                                    <h4 className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                                        <Download size={16} /> Install App
+                                    </h4>
+                                    <button
+                                        onClick={handleInstallClick}
+                                        className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                                    >
+                                        <Download size={18} />
+                                        Add to Home Screen
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Theme Setting */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">

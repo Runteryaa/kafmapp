@@ -118,6 +118,7 @@ export const t = {
         unknown: 'Unknown',
         zoomInToSearch: 'Zoom in to see cafes and restaurants',
         installApp: 'Install App',
+        installInstructions: 'Tap on browser menu and select "Add to Home Screen".',
     },
     tr: {
         searchPlaceholder: 'Kafe veya restoran ara...',
@@ -235,7 +236,8 @@ export const t = {
         zoomIn: 'Yaklaştır',
         unknown: 'Bilinmeyen',
         zoomInToSearch: 'Kafeleri ve restoranları görmek için yakınlaştırın',
-        installApp: 'Uygulamayı Yükle'
+        installApp: 'Uygulamayı Yükle',
+        installInstructions: 'Tarayıcı menüsünü açın ve "Ana Ekrana Ekle"yi seçin.'
     }
 };
 

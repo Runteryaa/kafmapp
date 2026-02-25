@@ -112,6 +112,7 @@ export default function Home() {
     const [placeReports, setPlaceReports] = useState<any[]>([]);
     const [placeUpdates, setPlaceUpdates] = useState<any[]>([]);
     const [installPrompt, setInstallPrompt] = useState<any>(null);
+    const [isAppInstalled, setIsAppInstalled] = useState(false);
 
     useEffect(() => {
         if ('serviceWorker' in navigator) {
@@ -132,13 +133,26 @@ export default function Home() {
 
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+        // Check if app is already installed
+        const checkInstalled = () => {
+            if (window.matchMedia('(display-mode: standalone)').matches) {
+                setIsAppInstalled(true);
+            }
+        };
+        checkInstalled();
+        window.addEventListener('appinstalled', () => setIsAppInstalled(true));
+
         return () => {
             window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+            window.removeEventListener('appinstalled', () => setIsAppInstalled(true));
         };
     }, []);
 
     const handleInstallClick = () => {
-        if (!installPrompt) return;
+        if (!installPrompt) {
+            showToast(t.installInstructions);
+            return;
+        }
         installPrompt.prompt();
         installPrompt.userChoice.then((choiceResult: any) => {
             if (choiceResult.outcome === 'accepted') {
@@ -872,7 +886,7 @@ export default function Home() {
                         </div>
                         <div className="p-6 space-y-6">
                             {/* Install App Button */}
-                            {installPrompt && (
+                            {!isAppInstalled && (
                                 <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 flex items-center justify-between border border-amber-100 dark:border-amber-800/50">
                                     <div className="flex items-center gap-3">
                                         <div className="bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-500 p-2 rounded-lg">
@@ -885,7 +899,7 @@ export default function Home() {
                                     </div>
                                     <button
                                         onClick={handleInstallClick}
-                                        className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm ${installPrompt ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'}`}
                                     >
                                         {t.installApp}
                                     </button>

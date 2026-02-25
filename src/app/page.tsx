@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import {
     MapPin, Search, Coffee, Utensils, Pizza, Beer,
     Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
-    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle, Pencil, ThumbsUp
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle, Pencil, ThumbsUp, Download
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
@@ -111,6 +111,44 @@ export default function Home() {
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
     const [placeReports, setPlaceReports] = useState<any[]>([]);
     const [placeUpdates, setPlaceUpdates] = useState<any[]>([]);
+    const [installPrompt, setInstallPrompt] = useState<any>(null);
+
+    useEffect(() => {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').then(
+                function (registration) {
+                    console.log('Service Worker registration successful with scope: ', registration.scope);
+                },
+                function (err) {
+                    console.log('Service Worker registration failed: ', err);
+                }
+            );
+        }
+
+        const handleBeforeInstallPrompt = (e: any) => {
+            e.preventDefault();
+            setInstallPrompt(e);
+        };
+
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        };
+    }, []);
+
+    const handleInstallClick = () => {
+        if (!installPrompt) return;
+        installPrompt.prompt();
+        installPrompt.userChoice.then((choiceResult: any) => {
+            if (choiceResult.outcome === 'accepted') {
+                console.log('User accepted the A2HS prompt');
+            } else {
+                console.log('User dismissed the A2HS prompt');
+            }
+            setInstallPrompt(null);
+        });
+    };
 
     useEffect(() => {
         if (selectedId) {
@@ -833,6 +871,27 @@ export default function Home() {
                             </button>
                         </div>
                         <div className="p-6 space-y-6">
+                            {/* Install App Button */}
+                            {installPrompt && (
+                                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-4 flex items-center justify-between border border-amber-100 dark:border-amber-800/50">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-500 p-2 rounded-lg">
+                                            <Download size={20} />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-gray-900 dark:text-white text-sm">{t.installApp}</h4>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">{t.installApp}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleInstallClick}
+                                        className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                                    >
+                                        {t.installApp}
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Theme Setting */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">

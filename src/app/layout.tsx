@@ -16,9 +16,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "kaf'map - Toilet Passwords & Menus",
   description: "Find toilet passwords and menu prices for cafes and restaurants.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg"
+  }
 };
 
 export const viewport: Viewport = {
+  themeColor: "#f59e0b",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

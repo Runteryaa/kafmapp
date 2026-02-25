@@ -1,0 +1,15 @@
+{
+  "name": "kaf'map - Toilet Passwords & Menus",
+  "short_name": "kafmap",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f59e0b",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

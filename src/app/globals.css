@@ -29,6 +29,10 @@
     animation: fadeIn 0.3s ease-in-out forwards;
   }
 
+  .animate-slide-up {
+    animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
   /* Brightness filter for dark mode map tiles */
   .map-tiles-dark {
     filter: brightness(2) contrast(0.7);
@@ -42,6 +46,15 @@
   }
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
     transform: translateY(0);
   }
 }

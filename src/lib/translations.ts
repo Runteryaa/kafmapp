@@ -119,6 +119,10 @@ export const t = {
         zoomInToSearch: 'Zoom in to see cafes and restaurants',
         installApp: 'Install App',
         installInstructions: 'Tap on browser menu and select "Add to Home Screen".',
+        installTitle: "Install kaf'map",
+        installSubtitle: "Get the full experience",
+        installDescription: "Add to your home screen for faster access and a better experience.",
+        installBtnLong: "Add to Home Screen",
     },
     tr: {
         searchPlaceholder: 'Kafe veya restoran ara...',
@@ -237,7 +241,11 @@ export const t = {
         unknown: 'Bilinmeyen',
         zoomInToSearch: 'Kafeleri ve restoranları görmek için yakınlaştırın',
         installApp: 'Uygulamayı Yükle',
-        installInstructions: 'Tarayıcı menüsünü açın ve "Ana Ekrana Ekle"yi seçin.'
+        installInstructions: 'Tarayıcı menüsünü açın ve "Ana Ekrana Ekle"yi seçin.',
+        installTitle: "kaf'map'i Yükle",
+        installSubtitle: "Tam deneyim için yükleyin",
+        installDescription: "Daha hızlı erişim ve daha iyi bir deneyim için ana ekranınıza ekleyin.",
+        installBtnLong: "Ana Ekrana Ekle",
     }
 };
 

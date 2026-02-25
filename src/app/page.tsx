@@ -115,17 +115,36 @@ export default function Home() {
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstallable, setIsInstallable] = useState(false);
 
+    
     useEffect(() => {
+        if (typeof window !== 'undefined' && 'install' in navigator) {
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+            if (!isStandalone) {
+                setIsInstallable(true);
+            }
+        }
+
         const handleBeforeInstallPrompt = (e: any) => {
             e.preventDefault();
             setDeferredPrompt(e);
             setIsInstallable(true);
         };
+        
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     }, []);
 
     const handleInstallClick = async () => {
+        if ('install' in navigator) {
+            try {
+                await (navigator as any).install();
+                setIsInstallable(false);
+                return;
+            } catch (error) {
+                console.error('Installation via Web Install API failed:', error);
+            }
+        }
+
         if (!deferredPrompt) return;
         deferredPrompt.prompt();
         const { outcome } = await deferredPrompt.userChoice;
@@ -134,6 +153,7 @@ export default function Home() {
             setIsInstallable(false);
         }
     };
+
 
     useEffect(() => {
         if (selectedId) {
@@ -1021,7 +1041,7 @@ export default function Home() {
                 >
                     <div className="flex items-center gap-2">
                         <div className="bg-amber-100 text-amber-700 p-2 rounded-lg">
-                            <MapPin size={20} className="stroke-[2.5]" />
+                            <img  src="/kafmap.svg" alt="Kaf'Map" className="w-5 h-5" />
                         </div>
                         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                             Kaf&apos;<span className="text-amber-600">Map</span>

@@ -1,37 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#2c3545" />
-      <stop offset="100%" stop-color="#141922" />
+    <linearGradient id="a" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2c3545"/>
+      <stop offset="100%" stop-color="#141922"/>
     </linearGradient>
-    <linearGradient id="coffee" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#462a17" />
-      <stop offset="100%" stop-color="#1b0c05" />
+    <linearGradient id="f" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#462a17"/>
+      <stop offset="100%" stop-color="#1b0c05"/>
     </linearGradient>
-    <clipPath id="split">
-      <rect x="256" y="0" width="256" height="512" />
+    <clipPath id="e">
+      <path d="M256 0h256v512H256z"/>
     </clipPath>
-    <path id="pin" d="M 121 200 L 146 200 A 110 110 0 0 0 358 240 L 385 240 C 385 330, 290 420, 256 475 C 222 420, 121 330, 121 200 Z" />
-    <rect id="handle" x="300" y="170" width="85" height="46" rx="23" />
-    <circle id="mug" cx="256" cy="200" r="90" />
+    <circle id="d" cx="256" cy="200" r="90"/>
+    <rect id="c" x="300" y="170" width="85" height="46" rx="23"/>
+    <path id="b" d="M121 200h25a110 110 0 0 0 212 40h27c0 90-95 180-129 235-34-55-135-145-135-275"/>
   </defs>
-
-  <rect width="512" height="512" rx="115" fill="url(#bg)" />
-
-  <use href="#pin" fill="#fca311" />
-  <use href="#handle" fill="#fca311" />
-  <use href="#mug" fill="#fca311" />
-
-  <g clip-path="url(#split)">
-    <use href="#pin" fill="#e85d04" />
-    <use href="#handle" fill="#e85d04" />
-    <use href="#mug" fill="#e85d04" />
+  <rect width="512" height="512" rx="115" fill="url(#a)"/>
+  <use href="#b" fill="#fca311"/>
+  <use href="#c" fill="#fca311"/>
+  <use href="#d" fill="#fca311"/>
+  <g clip-path="url(#e)" fill="#e85d04">
+    <use href="#b"/>
+    <use href="#c"/>
+    <use href="#d"/>
   </g>
-
-  <circle cx="256" cy="200" r="74" fill="#784421" />
-  <circle cx="256" cy="200" r="74" fill="#522a10" clip-path="url(#split)" />
-  <circle cx="256" cy="200" r="62" fill="url(#coffee)" />
-  
-  <path d="M 215 155 A 48 48 0 0 0 215 245 A 58 58 0 0 1 215 155 Z" fill="#9c5f35" opacity="0.6" />
-  <path d="M 256 115 C 240 95, 280 70, 256 40 C 265 60, 245 80, 256 115 Z" fill="#f8edeb" opacity="0.85" />
+  <circle cx="256" cy="200" r="74" fill="#784421"/>
+  <circle cx="256" cy="200" r="74" fill="#522a10" clip-path="url(#e)"/>
+  <circle cx="256" cy="200" r="62" fill="url(#f)"/>
+  <path d="M215 155a48 48 0 0 0 0 90 58 58 0 0 1 0-90" fill="#9c5f35" opacity=".6"/>
+  <path d="M256 115c-16-20 24-45 0-75 9 20-11 40 0 75" fill="#f8edeb" opacity=".85"/>
 </svg>

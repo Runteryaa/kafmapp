@@ -1040,8 +1040,12 @@ export default function Home() {
                     onTouchEnd={handleTouchEnd}
                 >
                     <div className="flex items-center gap-2">
-                        <div className="bg-amber-100 text-amber-700 p-2 rounded-lg">
-                            <img  src="/kafmap.svg" alt="Kaf'Map" className="w-5 h-5" />
+                        <div className="flex items-center justify-center bg-transparent">
+                            <img 
+                                src="/kafmap.svg" 
+                                alt="Kaf'Map Icon"
+                                className="w-10 h-10 bg-transparent object-contain drop-shadow-sm" 
+                            />
                         </div>
                         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
                             Kaf&apos;<span className="text-amber-600">Map</span>

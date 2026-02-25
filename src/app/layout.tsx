@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "kaf'map - Toilet Passwords & Menus",
+  title: "Kaf'Map - Toilet Passwords & Menus",
   description: "Find toilet passwords and menu prices for cafes and restaurants.",
   manifest: '/manifest.json',
 };

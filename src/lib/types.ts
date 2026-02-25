@@ -16,6 +16,12 @@ export interface Place {
   menu: MenuItem[];
   menuUrl?: string | null;
   isRegistered?: boolean;
+  wcUpdatedAt?: string;
+  wcUpvotes?: number;
+  wifiUpdatedAt?: string;
+  wifiUpvotes?: number;
+  menuUpdatedAt?: string;
+  menuUpvotes?: number;
 }
 
 export interface LocationState {

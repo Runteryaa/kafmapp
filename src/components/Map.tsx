@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import "leaflet/dist/leaflet.css";
 
 import { Place, LocationState } from "../lib/types";
-import { MapContainer, TileLayer, Marker, Circle, useMapEvents } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Circle, useMapEvents, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 
 function MapEventsWrapper({ onZoomEnd, onMoveEnd, setMapRef }: any) {
@@ -19,7 +19,7 @@ function MapEventsWrapper({ onZoomEnd, onMoveEnd, setMapRef }: any) {
 }
 
 export default function MapComponent({
-    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap, onMapReady, theme, manualTrigger
+    places, onSelect, selectedId, isMobile, userLocation, flyToLocation, onOsmPlacesFetch, setIsFetchingMap, onMapReady, theme, manualTrigger, t
 }: {
     places: Place[], onSelect: (id: number) => void, selectedId: number | null, isMobile: boolean,
     userLocation: LocationState | null, flyToLocation: LocationState | null,
@@ -27,7 +27,8 @@ export default function MapComponent({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onMapReady?: (map: any) => void,
     theme?: 'light' | 'dark',
-    manualTrigger?: number
+    manualTrigger?: number,
+    t: any
 }) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [map, setMap] = useState<any>(null);
@@ -157,10 +158,10 @@ export default function MapComponent({
                     const lng = el.type === 'node' ? el.lon : el.center.lon;
                     return {
                         id: el.id,
-                        name: el.tags!.name || "Unknown",
+                        name: el.tags!.name || t.unknown,
                         lat, lng,
                         type: el.tags!.amenity as Place['type'],
-                        address: el.tags!['addr:street'] ? `${el.tags!['addr:street']} ${el.tags!['addr:housenumber'] || ''}` : "Address unknown",
+                        address: el.tags!['addr:street'] ? `${el.tags!['addr:street']} ${el.tags!['addr:housenumber'] || ''}` : t.addressUnknown,
                         toiletPass: null,
                         wifiPass: null,
                         rating: 0,
@@ -278,7 +279,7 @@ export default function MapComponent({
         <div style={{ height: "100%", width: "100%", position: "absolute", inset: 0 }}>
             {!showMarkers && (
                 <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[1000] bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-md border border-gray-200 text-sm font-medium text-gray-600 pointer-events-none whitespace-nowrap">
-                    Zoom in to see cafes and restaurants
+                    {t.zoomInToSearch}
                 </div>
             )}
 
@@ -309,7 +310,11 @@ export default function MapComponent({
                             position={[place.lat, place.lng]}
                             icon={getCustomIcon(place.type, isUnclaimed)}
                             eventHandlers={{ click: () => onSelect(place.id) }}
-                        />
+                        >
+                            <Tooltip direction="top" offset={[0, -16]} opacity={1} className="custom-tooltip">
+                                <span className="font-semibold text-gray-900 border-none shadow-none text-sm">{place.name}</span>
+                            </Tooltip>
+                        </Marker>
                     )
                 })}
 

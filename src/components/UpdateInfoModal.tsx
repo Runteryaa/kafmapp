@@ -8,12 +8,14 @@ export function UpdateInfoModal({
     isOpen,
     onClose,
     place,
-    onSuccess
+    onSuccess,
+    t
 }: {
     isOpen: boolean;
     onClose: () => void;
     place: Place | null;
     onSuccess: () => void;
+    t: any;
 }) {
     const [toiletPass, setToiletPass] = useState("");
     const [wifiPass, setWifiPass] = useState("");
@@ -87,7 +89,7 @@ export function UpdateInfoModal({
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">Update Info</h2>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t.updateInfo}</h2>
                         <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-[250px]">{place.name}</p>
                     </div>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full">
@@ -106,7 +108,7 @@ export function UpdateInfoModal({
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Toilet Code
+                                    {t.toiletCode}
                                 </label>
                                 <input
                                     type="text"
@@ -118,7 +120,7 @@ export function UpdateInfoModal({
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                    Wi-Fi Password
+                                    {t.wifiPassword}
                                 </label>
                                 <input
                                     type="text"
@@ -132,7 +134,7 @@ export function UpdateInfoModal({
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
-                                <Link size={14} /> Full Menu URL (Optional)
+                                <Link size={14} /> {t.fullMenuUrl}
                             </label>
                             <input
                                 type="url"
@@ -146,10 +148,10 @@ export function UpdateInfoModal({
                         <div className="border-t border-gray-100 dark:border-gray-700 pt-6">
                             <div className="flex items-center justify-between mb-4">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Menu Items
+                                    {t.menuItems}
                                 </label>
                                 <button type="button" onClick={addMenuItem} className="text-xs font-semibold text-amber-600 dark:text-amber-500 hover:text-amber-700 flex items-center gap-1 bg-amber-50 dark:bg-amber-900/30 px-2 py-1 rounded-lg transition-colors">
-                                    <Plus size={14} /> Add Item
+                                    <Plus size={14} /> {t.addItem}
                                 </button>
                             </div>
 
@@ -161,7 +163,7 @@ export function UpdateInfoModal({
                                                 type="text"
                                                 value={m.item}
                                                 onChange={(e) => updateMenu(idx, 'item', e.target.value)}
-                                                placeholder="Item (e.g. Latte)"
+                                                placeholder={t.itemPlaceholder}
                                                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-xl shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:bg-gray-700 dark:text-white text-sm"
                                             />
                                         </div>
@@ -199,7 +201,7 @@ export function UpdateInfoModal({
                         onClick={onClose}
                         className="px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors"
                     >
-                        Cancel
+                        {t.cancel}
                     </button>
                     <button
                         form="update-form"
@@ -208,7 +210,7 @@ export function UpdateInfoModal({
                         className="px-5 py-2.5 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 dark:disabled:bg-amber-800 rounded-xl transition-colors flex items-center gap-2 shadow-sm"
                     >
                         {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                        Submit for Approval
+                        {t.submitForApproval}
                     </button>
                 </div>
             </div>

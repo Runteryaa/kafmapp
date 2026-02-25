@@ -52,6 +52,26 @@ export default function AdminPage() {
             const docId = `place_${payload.placeId}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
 
             try {
+                const existingPlace = await databases.getDocument('kafmap', 'places', docId);
+                if (payload.toiletPass !== undefined && payload.toiletPass !== existingPlace.toiletPass) {
+                    payload.wcUpvotes = 0;
+                    payload.wcUpdatedAt = new Date().toISOString();
+                }
+                if (payload.wifiPass !== undefined && payload.wifiPass !== existingPlace.wifiPass) {
+                    payload.wifiUpvotes = 0;
+                    payload.wifiUpdatedAt = new Date().toISOString();
+                }
+                if (payload.menu !== undefined && payload.menu !== existingPlace.menu) {
+                    payload.menuUpvotes = 0;
+                    payload.menuUpdatedAt = new Date().toISOString();
+                }
+            } catch (e) {
+                // Ignore if not found
+            }
+
+            delete payload.verifyCount;
+
+            try {
                 // Try to update existing document first in the main places collection
                 await databases.updateDocument('kafmap', 'places', docId, payload);
             } catch (updateErr: any) {

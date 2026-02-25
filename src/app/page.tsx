@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import {
     MapPin, Search, Coffee, Utensils, Pizza, Beer,
     Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
-    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle, Pencil, ThumbsUp
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
@@ -110,25 +110,130 @@ export default function Home() {
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
     const [placeReports, setPlaceReports] = useState<any[]>([]);
+    const [placeUpdates, setPlaceUpdates] = useState<any[]>([]);
 
     useEffect(() => {
         if (selectedId) {
             databases.listDocuments('kafmap', 'pending_updates', [
-                Query.equal('placeId', selectedId.toString()),
-                Query.equal('type', 'report')
+                Query.equal('placeId', selectedId.toString())
             ]).then(res => {
-                setPlaceReports(res.documents);
+                const docs = res.documents;
+                setPlaceReports(docs.filter(d => d.type === 'report'));
+                setPlaceUpdates(docs.filter(d => d.type === 'update'));
             }).catch(err => {
-                console.error("Failed to fetch reports", err);
+                console.error("Failed to fetch pending updates/reports", err);
             });
         } else {
             setPlaceReports([]);
+            setPlaceUpdates([]);
         }
     }, [selectedId]);
 
     const hasReport = (code: string) => placeReports.some(r => {
         try { return JSON.parse(r.payload).reasonCode === code; } catch { return false; }
     });
+
+    const [pendingVerificationState, setPendingVerificationState] = useState<{
+        updateId: string,
+        field: 'toiletPass' | 'wifiPass' | 'menu',
+        newValue: any,
+        currentVerifyCount: number,
+        fullPayload: any
+    } | null>(null);
+
+    const getPendingUpdate = (field: 'toiletPass' | 'wifiPass' | 'menu') => {
+        if (!selectedPlace || !selectedPlace.isRegistered) return null;
+        for (const update of placeUpdates) {
+            try {
+                const payload = JSON.parse(update.payload);
+                let isChanged = false;
+
+                if (field === 'menu') {
+                    if (payload.menu && payload.menu !== JSON.stringify(selectedPlace.menu)) isChanged = true;
+                } else {
+                    if (payload[field] !== undefined && payload[field] !== selectedPlace[field]) isChanged = true;
+                }
+
+                if (isChanged) {
+                    return {
+                        id: update.$id,
+                        value: field === 'menu' ? payload.menu : payload[field],
+                        verifyCount: payload.verifyCount || 0,
+                        fullPayload: payload
+                    };
+                }
+            } catch { continue; }
+        }
+        return null;
+    };
+
+    const handleVerifyPendingUpdate = async () => {
+        if (!user) {
+            showToast(t.loginToVerify);
+            setIsLoginOpen(true);
+            return;
+        }
+        if (!pendingVerificationState || !selectedPlace) return;
+
+        const { updateId, field, newValue, currentVerifyCount, fullPayload } = pendingVerificationState;
+
+        const verifyKey = `verified_pending_${updateId}_user_${user.$id}`;
+        if (localStorage.getItem(verifyKey)) {
+            showToast(t.alreadyVerifiedPending);
+            return;
+        }
+
+        const newCount = currentVerifyCount + 1;
+
+        if (newCount >= 2) {
+            try {
+                const docId = `place_${selectedPlace.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+                const placesPayload: any = { ...fullPayload };
+
+                if (placesPayload.toiletPass !== undefined && placesPayload.toiletPass !== selectedPlace.toiletPass) {
+                    placesPayload.wcUpvotes = 0;
+                    placesPayload.wcUpdatedAt = new Date().toISOString();
+                }
+                if (placesPayload.wifiPass !== undefined && placesPayload.wifiPass !== selectedPlace.wifiPass) {
+                    placesPayload.wifiUpvotes = 0;
+                    placesPayload.wifiUpdatedAt = new Date().toISOString();
+                }
+                if (placesPayload.menu !== undefined && placesPayload.menu !== JSON.stringify(selectedPlace.menu)) {
+                    placesPayload.menuUpvotes = 0;
+                    placesPayload.menuUpdatedAt = new Date().toISOString();
+                }
+                delete placesPayload.verifyCount;
+
+                await databases.updateDocument('kafmap', 'places', docId, placesPayload);
+                await databases.deleteDocument('kafmap', 'pending_updates', updateId);
+
+                showToast(t.updateVerifiedApplied);
+                setPendingVerificationState(null);
+                fetchDbPlaces();
+                setPlaceUpdates(placeUpdates.filter(u => u.$id !== updateId));
+            } catch (err) {
+                console.error(err);
+                showToast(t.failedToApplyUpdate);
+            }
+        } else {
+            try {
+                fullPayload.verifyCount = newCount;
+                await databases.updateDocument('kafmap', 'pending_updates', updateId, {
+                    payload: JSON.stringify(fullPayload)
+                });
+                localStorage.setItem(verifyKey, "true");
+                showToast(t.verificationSubmitted);
+                setPendingVerificationState(null);
+                setPlaceUpdates(placeUpdates.map(u => {
+                    if (u.$id === updateId) return { ...u, payload: JSON.stringify(fullPayload) };
+                    return u;
+                }));
+            } catch (err) {
+                console.error(err);
+                showToast(t.failedToVerifyUpdate);
+            }
+        }
+    };
 
     // Fetch places data from Appwrite DB and construct full Place objects
     const fetchDbPlaces = async () => {
@@ -147,7 +252,13 @@ export default function Home() {
                 // Calculate average rating from ratingSum and ratingCount
                 rating: Number(doc.ratingCount) > 0 ? Number(doc.ratingSum) / Number(doc.ratingCount) : 0,
                 menu: doc.menu ? JSON.parse(doc.menu) : [],
-                isRegistered: true
+                isRegistered: true,
+                wcUpdatedAt: doc.wcUpdatedAt || doc.$updatedAt,
+                wcUpvotes: doc.wcUpvotes || 0,
+                wifiUpdatedAt: doc.wifiUpdatedAt || doc.$updatedAt,
+                wifiUpvotes: doc.wifiUpvotes || 0,
+                menuUpdatedAt: doc.menuUpdatedAt || doc.$updatedAt,
+                menuUpvotes: doc.menuUpvotes || 0,
             }));
             setDbPlaces(placesList);
         } catch (error) {
@@ -176,17 +287,6 @@ export default function Home() {
             localStorage.setItem('theme', theme);
         }
     }, [theme, isThemeLoaded]);
-
-    // Verify Appwrite setup on load
-    useEffect(() => {
-        client.ping().then(() => {
-            console.log("Appwrite ping successful!");
-            // showToast("Appwrite setup verified.");
-        }).catch((err) => {
-            console.error("Appwrite ping failed:", err);
-            // showToast("Appwrite connection failed.");
-        });
-    }, []);
 
     // Initial mobile detection
     useEffect(() => {
@@ -221,13 +321,13 @@ export default function Home() {
     const handleLogout = async () => {
         try {
             await logout();
-            showToast("Logged out successfully");
+            showToast(t.loggedOutSuccessfully);
             setIsBurgerMenuOpen(false);
         } catch (error) {
             console.error("Logout failed", error);
-            showToast("Logout failed");
+            showToast(t.logoutFailed);
         }
-    }
+    };
 
     const handleRatePlace = async (ratingValue: number) => {
         if (!user) {
@@ -300,6 +400,37 @@ export default function Home() {
         setIsReportModalOpen(true);
     };
 
+    const handleVerifyField = async (field: 'wc' | 'wifi' | 'menu') => {
+        if (!user) {
+            showToast(t.loginToUpdate);
+            setIsLoginOpen(true);
+            return;
+        }
+
+        if (!selectedPlace) return;
+
+        const verifyKey = `verified_${field}_place_${selectedPlace.id}_user_${user.$id}`;
+        if (localStorage.getItem(verifyKey)) {
+            showToast(t.youHaveAlreadyVerifiedThis);
+            return;
+        }
+
+        const docId = `place_${selectedPlace.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+        try {
+            const currentUpvotes = selectedPlace[`${field}Upvotes`] || 0;
+            const updatePayload: any = {};
+            updatePayload[`${field}Upvotes`] = currentUpvotes + 1;
+
+            await databases.updateDocument('kafmap', 'places', docId, updatePayload);
+            localStorage.setItem(verifyKey, "true");
+            showToast(t.verificationSubmitted);
+            fetchDbPlaces(); // Refresh local data
+        } catch (err) {
+            console.error("Verification failed", err);
+            showToast(t.failedToSubmitVerification);
+        }
+    };
+
 
     // Merge Strategies:
     // 1. Start with DB places (these are "registered" and have rich data)
@@ -333,6 +464,10 @@ export default function Home() {
     // Filter by search
     const filteredPlaces = combinedPlaces.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     const selectedPlace = combinedPlaces.find(p => p.id === selectedId);
+
+    const pendingWcUpdate = getPendingUpdate('toiletPass');
+    const pendingWifiUpdate = getPendingUpdate('wifiPass');
+    const pendingMenuUpdate = getPendingUpdate('menu');
 
     const isMobileSearchVisible = isMobile && !isMobilePanelOpen && !selectedId;
 
@@ -374,9 +509,96 @@ export default function Home() {
         setTimeout(() => setToastMessage(null), 2500);
     };
 
+    const getDaysDiff = (dateStr: string | undefined | null) => {
+        if (!dateStr) return -1;
+        const d1 = new Date(dateStr);
+        const d2 = new Date();
+        const diffTime = Math.abs(d2.getTime() - d1.getTime());
+        return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    };
+
+    const renderVerificationFooter = (
+        field: 'wc' | 'wifi' | 'menu',
+        updatedAt: string | undefined | null,
+        upvotes: number | undefined,
+        pendingUpdateItem: any = null,
+        reportMessage: string | null = null
+    ) => {
+        if (!updatedAt) return null;
+        const daysDiff = getDaysDiff(updatedAt);
+        if (daysDiff === -1) return null;
+
+        const isOutdated = daysDiff > 30 && (upvotes || 0) === 0;
+
+        let isVerifiedLocally = false;
+        if (typeof window !== 'undefined' && user && selectedPlace) {
+            const verifyKey = `verified_${field}_place_${selectedPlace.id}_user_${user.$id}`;
+            isVerifiedLocally = !!localStorage.getItem(verifyKey);
+        }
+
+        return (
+            <div className="flex flex-col mt-3 pt-2.5 border-t border-black/5 dark:border-white/5 gap-2">
+                {/* Alerts Section */}
+                {(isOutdated || pendingUpdateItem || reportMessage) && (
+                    <div className="flex flex-col gap-1.5 pt-0.5">
+                        {reportMessage && (
+                            <button
+                                onClick={() => setAlertMessage(t.flagTooltip.replace('{reason}', reportMessage.toLowerCase()))}
+                                className="flex items-center gap-1.5 text-left text-[11px] font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+                            >
+                                <AlertTriangle size={12} className="shrink-0" />
+                                <span>{t.flagTooltip.replace('{reason}', reportMessage)}</span>
+                            </button>
+                        )}
+                        {pendingUpdateItem && (
+                            <button
+                                onClick={() => setPendingVerificationState({
+                                    updateId: pendingUpdateItem.id,
+                                    field: field === 'wc' ? 'toiletPass' : field === 'wifi' ? 'wifiPass' : 'menu',
+                                    newValue: pendingUpdateItem.value,
+                                    currentVerifyCount: pendingUpdateItem.verifyCount,
+                                    fullPayload: pendingUpdateItem.fullPayload
+                                })}
+                                className="flex items-center gap-1.5 text-left text-[11px] font-medium text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                            >
+                                <AlertTriangle size={12} className="shrink-0" />
+                                <span>{t.pendingUpdateVerifyHere}</span>
+                            </button>
+                        )}
+                        {isOutdated && !pendingUpdateItem && !reportMessage && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setAlertMessage(t.infoMightBeOutdated); }}
+                                className="flex items-center gap-1.5 text-left text-[11px] font-medium text-amber-600 dark:text-amber-500 hover:text-amber-700 transition-colors"
+                            >
+                                <AlertTriangle size={12} className="shrink-0" />
+                                <span>{t.infoMightBeOutdated}</span>
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-wrap text-[10px] text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center gap-1 font-medium bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded">
+                            {daysDiff === 0 ? t.updatedToday : t.updatedDaysAgo.replace('{days}', daysDiff.toString())}
+                        </span>
+                        <span className="font-medium opacity-80">&bull; {t.usedByPeople.replace('{count}', (upvotes || 0).toString())}</span>
+                    </div>
+                    <button
+                        onClick={() => handleVerifyField(field)}
+                        className={`flex items-center justify-center shrink-0 w-6 h-6 rounded-md transition-colors border ml-2 ${isVerifiedLocally ? 'bg-green-50 hover:bg-green-100 text-green-600 dark:bg-green-900/30 dark:hover:bg-green-900/50 dark:text-green-500 border-green-200/50 dark:border-green-800/50' : 'bg-amber-50 hover:bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:hover:bg-amber-900/50 dark:text-amber-500 border-amber-200/50 dark:border-amber-800/50'}`}
+                        title={isVerifiedLocally ? 'Verified' : t.verifyInfo}
+                    >
+                        <ThumbsUp size={12} className="stroke-[2.5]" />
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
     const handleLocateMe = () => {
         if (!navigator.geolocation) {
-            showToast("Geolocation is not supported by your browser");
+            showToast(t.geolocationNotSupported);
             return;
         }
 
@@ -391,11 +613,11 @@ export default function Home() {
                 setFlyToLocation(newLocation);
                 setIsLocating(false);
                 setSelectedId(null);
-                showToast("Location updated");
+                showToast(t.locationUpdated);
             },
             () => {
                 setIsLocating(false);
-                showToast("Unable to retrieve your location");
+                showToast(t.unableToRetrieveLocation);
             }
         );
     };
@@ -485,11 +707,11 @@ export default function Home() {
                         setIsMobilePanelOpen(false);
                     }
                 } else {
-                    showToast("Location not found");
+                    showToast(t.locationNotFound);
                 }
             } catch (error) {
                 console.error(error);
-                showToast("Search failed");
+                showToast(t.searchFailed);
             } finally {
                 setIsSearchingCity(false);
             }
@@ -531,7 +753,7 @@ export default function Home() {
                                         }}
                                         className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                                     >
-                                        <LogIn size={18} className="text-gray-400" /> Login
+                                        <LogIn size={18} className="text-gray-400" /> {t.login}
                                     </button>
                                     <button
                                         onClick={() => {
@@ -540,7 +762,7 @@ export default function Home() {
                                         }}
                                         className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                                     >
-                                        <UserPlus size={18} className="text-gray-400" /> Register
+                                        <UserPlus size={18} className="text-gray-400" /> {t.register}
                                     </button>
                                 </>
                             ) : (
@@ -553,7 +775,7 @@ export default function Home() {
                                         onClick={handleLogout}
                                         className="px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 text-sm font-medium text-red-600 dark:text-red-400 transition-colors w-full text-left"
                                     >
-                                        <LogOut size={18} className="text-red-400" /> Logout
+                                        <LogOut size={18} className="text-red-400" /> {t.logout}
                                     </button>
                                 </>
                             )}
@@ -566,7 +788,7 @@ export default function Home() {
                                 }}
                                 className="px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors w-full text-left"
                             >
-                                <Settings size={18} className="text-gray-400" /> Settings
+                                <Settings size={18} className="text-gray-400" /> {t.settings}
                             </button>
                         </div>
                     </div>
@@ -581,6 +803,7 @@ export default function Home() {
                     setIsLoginOpen(false);
                     setIsRegisterOpen(true);
                 }}
+                t={t}
             />
             <RegisterModal
                 isOpen={isRegisterOpen}
@@ -589,6 +812,7 @@ export default function Home() {
                     setIsRegisterOpen(false);
                     setIsLoginOpen(true);
                 }}
+                t={t}
             />
 
             {/* Settings Modal */}
@@ -612,20 +836,20 @@ export default function Home() {
                             {/* Theme Setting */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                    <Sun size={16} /> Appearance
+                                    <Sun size={16} /> {t.appearance}
                                 </label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         onClick={() => setTheme('light')}
                                         className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-sm font-medium transition-all ${theme === 'light' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
                                     >
-                                        <Sun size={16} /> Light
+                                        <Sun size={16} /> {t.light}
                                     </button>
                                     <button
                                         onClick={() => setTheme('dark')}
                                         className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-sm font-medium transition-all ${theme === 'dark' ? 'bg-gray-800 border-gray-700 text-white ring-1 ring-gray-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
                                     >
-                                        <Moon size={16} /> Dark
+                                        <Moon size={16} /> {t.dark}
                                     </button>
                                 </div>
                             </div>
@@ -633,20 +857,20 @@ export default function Home() {
                             {/* Language Setting */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                    <Languages size={16} /> Language
+                                    <Languages size={16} /> {t.language}
                                 </label>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
                                         onClick={() => setLanguage('tr')}
                                         className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'tr' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
                                     >
-                                        Turkish
+                                        {t.turkish}
                                     </button>
                                     <button
                                         onClick={() => setLanguage('en')}
                                         className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'en' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
                                     >
-                                        English
+                                        {t.english}
                                     </button>
                                 </div>
                             </div>
@@ -656,7 +880,7 @@ export default function Home() {
                                 onClick={() => setIsSettingsOpen(false)}
                                 className="bg-gray-900 dark:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors shadow-sm"
                             >
-                                Done
+                                {t.done}
                             </button>
                         </div>
                     </div>
@@ -670,8 +894,9 @@ export default function Home() {
                 place={selectedPlace || null}
                 onSuccess={() => {
                     fetchDbPlaces(); // Refresh DB data
-                    showToast("Changes submitted for admin approval!");
+                    showToast(t.changesSubmittedForAdmin);
                 }}
+                t={t}
             />
 
             {/* Toast Notification */}
@@ -726,7 +951,7 @@ export default function Home() {
                             <MapPin size={20} className="stroke-[2.5]" />
                         </div>
                         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                            kaf&apos;<span className="text-amber-600">map</span>
+                            Kaf&apos;<span className="text-amber-600">Map</span>
                         </h1>
                     </div>
                     {isMobile && (
@@ -771,7 +996,7 @@ export default function Home() {
                                                     </button>
                                                 ))}
                                                 <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 ml-1 font-medium">
-                                                    {selectedPlace.rating ? selectedPlace.rating.toFixed(1) : t.new}
+                                                    {selectedPlace.rating ? selectedPlace.rating.toFixed(1) : ''}
                                                 </span>
                                                 <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
                                                 <button onClick={handleReportPlace} className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full dark:hover:bg-red-900/20 hover:bg-red-50" title="Report inaccurate info">
@@ -794,30 +1019,20 @@ export default function Home() {
                                             <div className="relative z-10">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">{t.toiletCode}</p>
-                                                    {hasReport('wcPasswordIncorrect') && (
-                                                        <button
-                                                            onClick={() => setAlertMessage(t.flagTooltip.replace('{reason}', t.wcPasswordIncorrect.toLowerCase()))}
-                                                            className="relative flex items-center justify-center cursor-pointer ml-1.5 transition-transform hover:scale-110"
-                                                            title={t.flagTooltip.replace('{reason}', t.wcPasswordIncorrect)}
-                                                        >
-                                                            <div className="flex bg-red-100 dark:bg-red-900/30 p-1 rounded-full ring-1 ring-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.4)]">
-                                                                <AlertTriangle size={14} className="text-red-500 animate-pulse" />
-                                                            </div>
+                                                    <div className="ml-auto flex items-center gap-1.5">
+                                                        <button onClick={() => { if (!user) { showToast(t.loginToUpdate); setIsLoginOpen(true); } else { setIsUpdateModalOpen(true); } }} className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors flex items-center justify-center bg-blue-100/50 dark:bg-blue-900/50 rounded-md p-1" title="Edit">
+                                                            <Pencil size={12} />
                                                         </button>
-                                                    )}
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center justify-between h-8">
                                                     {selectedPlace.toiletPass ? (
                                                         <p className="text-lg font-mono font-bold text-gray-900 dark:text-white tracking-tight">{selectedPlace.toiletPass}</p>
                                                     ) : (
-                                                        <p className="text-sm font-semibold text-gray-400 italic">N/A</p>
-                                                    )}
-                                                    {selectedPlace.toiletPass && selectedPlace.toiletPass !== 'Ask to staff' && (
-                                                        <button onClick={() => handleCopy(selectedPlace.toiletPass!)} className="text-blue-500 hover:text-blue-700 bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:text-blue-300 rounded-md p-1.5 shadow-sm transition-colors" title="Copy">
-                                                            <Copy size={16} />
-                                                        </button>
+                                                        <p className="text-sm font-semibold text-gray-400 italic">{t.noWC}</p>
                                                     )}
                                                 </div>
+                                                {selectedPlace.isRegistered && (selectedPlace.toiletPass && selectedPlace.toiletPass !== 'Ask to staff' && selectedPlace.toiletPass !== 'No' && selectedPlace.toiletPass !== 'None' && selectedPlace.toiletPass !== 'free' && selectedPlace.toiletPass !== 'ücretsiz' && selectedPlace.toiletPass !== 'ucretsiz' && selectedPlace.toiletPass !== 'Free' && selectedPlace.toiletPass !== 'Ücretsiz' && selectedPlace.toiletPass !== 'Ucretsiz') && renderVerificationFooter('wc', selectedPlace.wcUpdatedAt, selectedPlace.wcUpvotes, pendingWcUpdate, hasReport('wcPasswordIncorrect') ? t.wcPasswordIncorrect : null)}
                                             </div>
                                         </div>
 
@@ -829,17 +1044,11 @@ export default function Home() {
                                             <div className="relative z-10">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide">{t.freeWifi}</p>
-                                                    {hasReport('wifiPasswordIncorrect') && (
-                                                        <button
-                                                            onClick={() => setAlertMessage(t.flagTooltip.replace('{reason}', t.wifiPasswordIncorrect.toLowerCase()))}
-                                                            className="relative flex items-center justify-center cursor-pointer ml-1.5 transition-transform hover:scale-110"
-                                                            title={t.flagTooltip.replace('{reason}', t.wifiPasswordIncorrect)}
-                                                        >
-                                                            <div className="flex bg-red-100 dark:bg-red-900/30 p-1 rounded-full ring-1 ring-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.4)]">
-                                                                <AlertTriangle size={14} className="text-red-500 animate-pulse" />
-                                                            </div>
+                                                    <div className="ml-auto flex items-center gap-1.5">
+                                                        <button onClick={() => { if (!user) { showToast(t.loginToUpdate); setIsLoginOpen(true); } else { setIsUpdateModalOpen(true); } }} className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition-colors flex items-center justify-center bg-green-100/50 dark:bg-green-900/50 rounded-md p-1" title="Edit">
+                                                            <Pencil size={12} />
                                                         </button>
-                                                    )}
+                                                    </div>
                                                 </div>
                                                 <div className="flex items-center justify-between h-8">
                                                     {selectedPlace.wifiPass ? (
@@ -853,6 +1062,7 @@ export default function Home() {
                                                         </button>
                                                     )}
                                                 </div>
+                                                {selectedPlace.isRegistered && (selectedPlace.wifiPass && selectedPlace.wifiPass !== 'No' && selectedPlace.wifiPass !== 'None' && selectedPlace.wifiPass !== 'Free' && selectedPlace.wifiPass !== 'Open' && selectedPlace.wifiPass !== 'Ask to staff') && renderVerificationFooter('wifi', selectedPlace.wifiUpdatedAt, selectedPlace.wifiUpvotes, pendingWifiUpdate, hasReport('wifiPasswordIncorrect') ? t.wifiPasswordIncorrect : null)}
                                             </div>
                                         </div>
                                     </div>
@@ -860,7 +1070,14 @@ export default function Home() {
                                     {/* Menu Section (Snippet) */}
                                     <div className="mt-8">
                                         <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">{t.menuSnippet}</h3>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">{t.menuSnippet}</h3>
+                                                <div className="ml-auto flex items-center gap-1.5">
+                                                    <button onClick={() => { if (!user) { showToast(t.loginToUpdate); setIsLoginOpen(true); } else { setIsUpdateModalOpen(true); } }} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 p-1.5 rounded-md flex items-center justify-center" title={t.edit}>
+                                                        <Pencil size={12} />
+                                                    </button>
+                                                </div>
+                                            </div>
                                             <span className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-2 py-1 rounded-md">{t.lastUpdatedToday}</span>
                                         </div>
                                         {selectedPlace.menuUrl ? (
@@ -871,7 +1088,7 @@ export default function Home() {
                                                 className="w-full bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-medium py-4 rounded-xl transition-colors flex items-center justify-center gap-2 border border-blue-100 dark:border-blue-800"
                                             >
                                                 <ExternalLink size={18} />
-                                                Open Full Online Menu
+                                                {t.openUrlMenu}
                                             </a>
                                         ) : (
                                             <div className={`bg-white dark:bg-gray-800 border rounded-xl shadow-sm ${selectedPlace.menu.length > 0 ? 'border-gray-100 dark:border-gray-700 p-4' : 'border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 p-6 flex flex-col items-center justify-center text-center'}`}>
@@ -886,7 +1103,7 @@ export default function Home() {
                                                         {selectedPlace.menu.length > 3 && (
                                                             <div className="pt-3 text-center border-t border-gray-50 dark:border-gray-700 mt-2">
                                                                 <button onClick={() => setIsMenuFullscreen(true)} className="text-xs font-semibold text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 flex items-center justify-center gap-1 w-full">
-                                                                    <Maximize2 size={12} /> See all {selectedPlace.menu.length} items
+                                                                    <Maximize2 size={12} /> {t.seeAllItems.replace('{count}', selectedPlace.menu.length.toString())}
                                                                 </button>
                                                             </div>
                                                         )}
@@ -896,22 +1113,10 @@ export default function Home() {
                                                 )}
                                             </div>
                                         )}
+                                        {selectedPlace.isRegistered && (selectedPlace.menu.length > 0 || selectedPlace.menuUrl) && renderVerificationFooter('menu', selectedPlace.menuUpdatedAt, selectedPlace.menuUpvotes, pendingMenuUpdate, hasReport('menuPricesOutdated') ? t.menuPricesOutdated : null)}
                                     </div>
 
-                                    {/* Action Button */}
-                                    <button
-                                        onClick={() => {
-                                            if (!user) {
-                                                showToast(t.loginToUpdate);
-                                                setIsLoginOpen(true);
-                                            } else {
-                                                setIsUpdateModalOpen(true);
-                                            }
-                                        }}
-                                        className="w-full mt-6 bg-gray-900 dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white font-medium py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        Update Info
-                                    </button>
+                                    {/* Action Button Removed -> Use Pencils Instead */}
                                 </div>
                             </div>
                         );
@@ -986,14 +1191,12 @@ export default function Home() {
 
                                                             {/* Menu Status */}
                                                             {place.menu.length > 0 ? (
-                                                                <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12} /> Menu</span>
+                                                                <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12} /> {t.menu}</span>
                                                             ) : (
-                                                                <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1"><Utensils size={12} /> Menu</span>
+                                                                <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1"><Utensils size={12} /> {t.menu}</span>
                                                             )}
                                                         </>
-                                                    ) : (
-                                                        <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1 uppercase tracking-wider text-[10px]">{t.unclaimed}</span>
-                                                    )}
+                                                    ) : null}
                                                 </div>
                                             </div>
                                         </div>
@@ -1019,6 +1222,7 @@ export default function Home() {
                     onMapReady={setMapInstance}
                     theme={theme}
                     manualTrigger={manualFetchTrigger}
+                    t={t}
                 />
 
                 {/* Floating Map Controls - Zoom Buttons (Left) */}
@@ -1026,14 +1230,14 @@ export default function Home() {
                     <button
                         onClick={handleZoomIn}
                         className="w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
-                        title="Zoom In"
+                        title={t.zoomIn}
                     >
                         <Plus size={20} />
                     </button>
                     <button
                         onClick={handleZoomOut}
                         className="w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700"
-                        title="Zoom Out"
+                        title={t.zoomOut}
                     >
                         <Minus size={20} />
                     </button>
@@ -1044,14 +1248,14 @@ export default function Home() {
                     <button
                         onClick={handleLocateMe}
                         className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isLocating ? 'animate-pulse text-blue-500' : ''}`}
-                        title="Locate Me"
+                        title={t.locateMe}
                     >
                         {isLocating ? <Loader2 size={22} className="animate-spin text-blue-500" /> : <Navigation size={20} className={`transform -rotate-45 ${userLocation ? "text-blue-500 fill-blue-500" : ""}`} />}
                     </button>
                     <button
                         onClick={() => setManualFetchTrigger(Date.now())}
                         className={`w-12 h-12 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-100 dark:border-gray-700 ${isFetchingMap ? 'text-amber-500' : ''}`}
-                        title="Scan Area"
+                        title={t.scanArea}
                         disabled={isFetchingMap}
                     >
                         {isFetchingMap ? <Loader2 size={20} className="animate-spin" /> : <RefreshCw size={20} />}
@@ -1071,7 +1275,7 @@ export default function Home() {
                             className="w-full bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 px-4 py-3 rounded-xl shadow-lg font-medium border border-gray-100 dark:border-gray-700 flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all text-left"
                         >
                             <Search size={20} className="text-gray-400" />
-                            <span className="text-sm">Search places...</span>
+                            <span className="text-sm">{t.searchPlaceholder}</span>
                         </button>
                     </div>
                 )}
@@ -1092,7 +1296,7 @@ export default function Home() {
                                 </div>
                                 <div className="min-w-0">
                                     <h2 className="text-lg font-bold text-gray-900 dark:text-white leading-tight truncate">{selectedPlace.name}</h2>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Full Menu</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{t.fullMenu}</p>
                                 </div>
                             </div>
                             <button
@@ -1120,7 +1324,7 @@ export default function Home() {
                                 </div>
                                 <div className="text-center mt-6 mb-8 flex flex-col items-center gap-2">
                                     <ShieldCheck size={20} className="text-gray-300 dark:text-gray-600" />
-                                    <p className="text-xs text-gray-400 dark:text-gray-500">Prices are user-submitted and may not be 100% accurate or up-to-date.</p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500">{t.pricesUserSubmitted}</p>
                                 </div>
                             </div>
                         </div>
@@ -1152,14 +1356,46 @@ export default function Home() {
                         <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mx-auto mb-5 ring-4 ring-red-50 dark:ring-red-900/20">
                             <AlertTriangle size={32} />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Attention</h3>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{t.attention}</h3>
                         <p className="text-base text-gray-600 dark:text-gray-300 mb-8 font-medium">{alertMessage}</p>
                         <button
                             onClick={() => setAlertMessage(null)}
                             className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3.5 rounded-xl transition-colors shadow-md shadow-red-500/20"
                         >
-                            Understood
+                            {t.understood}
                         </button>
+                    </div>
+                </div>
+            )}
+            {/* Pending Verification Modal */}
+            {pendingVerificationState && (
+                <div className="fixed inset-0 z-[7000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setPendingVerificationState(null)}>
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-sm shadow-2xl p-8 transform transition-all text-center border border-green-100 dark:border-green-900/30" onClick={e => e.stopPropagation()}>
+                        <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 text-green-500 rounded-full flex items-center justify-center mx-auto mb-5 ring-4 ring-green-50 dark:ring-green-900/20">
+                            <AlertTriangle size={32} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{t.pendingUpdate}</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{t.pendingUpdateDesc}</p>
+
+                        <div className="bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 rounded-xl p-4 font-mono font-medium text-lg mb-6 break-all">
+                            {pendingVerificationState.field === 'menu' ? t.newMenuDataUploaded : pendingVerificationState.newValue}
+                        </div>
+
+                        <div className="flex gap-3 mt-8">
+                            <button
+                                onClick={() => setPendingVerificationState(null)}
+                                className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-bold py-3.5 rounded-xl transition-colors"
+                            >
+                                {t.cancel}
+                            </button>
+                            <button
+                                onClick={handleVerifyPendingUpdate}
+                                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3.5 rounded-xl transition-colors shadow-md shadow-green-500/20 flex flex-col items-center justify-center leading-none"
+                            >
+                                <span>{t.verifyInfo}</span>
+                                <span className="text-[10px] opacity-80 mt-1">{t.verificationsCount.replace('{count}', pendingVerificationState.currentVerifyCount.toString())}</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

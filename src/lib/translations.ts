@@ -117,6 +117,9 @@ export const t = {
         zoomIn: 'Zoom In',
         unknown: 'Unknown',
         zoomInToSearch: 'Zoom in to see cafes and restaurants',
+        installApp: 'Install App',
+        install: 'Install',
+        installAppDesc: 'Install KafMap on your device for better experience.',
     },
     tr: {
         searchPlaceholder: 'Kafe veya restoran ara...',
@@ -233,7 +236,10 @@ export const t = {
         zoomOut: 'Uzaklaştır',
         zoomIn: 'Yaklaştır',
         unknown: 'Bilinmeyen',
-        zoomInToSearch: 'Kafeleri ve restoranları görmek için yakınlaştırın'
+        zoomInToSearch: 'Kafeleri ve restoranları görmek için yakınlaştırın',
+        installApp: 'Uygulamayı Yükle',
+        install: 'Yükle',
+        installAppDesc: 'Daha iyi bir deneyim için KafMap\'i cihazınıza yükleyin.',
     }
 };
 

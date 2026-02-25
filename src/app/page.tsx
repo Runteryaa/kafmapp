@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import {
     MapPin, Search, Coffee, Utensils, Pizza, Beer,
     Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
-    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle, Pencil, ThumbsUp
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle, Pencil, ThumbsUp, MonitorSmartphone
 } from "lucide-react";
 import { mockPlaces, LocationState, Place } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
@@ -111,6 +111,29 @@ export default function Home() {
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
     const [placeReports, setPlaceReports] = useState<any[]>([]);
     const [placeUpdates, setPlaceUpdates] = useState<any[]>([]);
+
+    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const [isInstallable, setIsInstallable] = useState(false);
+
+    useEffect(() => {
+        const handleBeforeInstallPrompt = (e: any) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+            setIsInstallable(true);
+        };
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    }, []);
+
+    const handleInstallClick = async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setDeferredPrompt(null);
+            setIsInstallable(false);
+        }
+    };
 
     useEffect(() => {
         if (selectedId) {
@@ -862,6 +885,27 @@ export default function Home() {
                             </button>
                         </div>
                         <div className="p-6 space-y-6">
+                            {/* Install App Setting */}
+                            {isInstallable && (
+                                <div className="animate-fade-in">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                                        <MonitorSmartphone size={16} /> {t.installApp}
+                                    </label>
+                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 rounded-xl p-4 flex items-center justify-between">
+                                        <div className="pr-4">
+                                            <p className="text-sm font-bold text-amber-900 dark:text-amber-400">{t.installApp}</p>
+                                            <p className="text-xs text-amber-700/80 dark:text-amber-500/80 mt-0.5">{t.installAppDesc}</p>
+                                        </div>
+                                        <button
+                                            onClick={handleInstallClick}
+                                            className="shrink-0 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition-colors shadow-sm shadow-amber-500/20"
+                                        >
+                                            {t.install}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Theme Setting */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">

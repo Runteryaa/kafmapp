@@ -141,8 +141,9 @@ export default function Home() {
         fullPayload: any
     } | null>(null);
 
-    const getPendingUpdate = (field: 'toiletPass' | 'wifiPass' | 'menu') => {
-        if (!selectedPlace || !selectedPlace.isRegistered) return null;
+    const getPendingUpdates = (field: 'toiletPass' | 'wifiPass' | 'menu') => {
+        if (!selectedPlace || !selectedPlace.isRegistered) return [];
+        const updates = [];
         for (const update of placeUpdates) {
             try {
                 const payload = JSON.parse(update.payload);
@@ -155,16 +156,16 @@ export default function Home() {
                 }
 
                 if (isChanged) {
-                    return {
+                    updates.push({
                         id: update.$id,
                         value: field === 'menu' ? payload.menu : payload[field],
                         verifyCount: payload.verifyCount || 0,
                         fullPayload: payload
-                    };
+                    });
                 }
             } catch { continue; }
         }
-        return null;
+        return updates;
     };
 
     const handleVerifyPendingUpdate = async () => {
@@ -205,12 +206,29 @@ export default function Home() {
                 delete placesPayload.verifyCount;
 
                 await databases.updateDocument('kafmap', 'places', docId, placesPayload);
+
+                // Delete the approved update
                 await databases.deleteDocument('kafmap', 'pending_updates', updateId);
+
+                // Delete all other pending updates that touch this same field for this place
+                const fieldKey = field === 'menu' ? 'menu' : field;
+                const updatesToDelete = placeUpdates.filter(u => {
+                    try {
+                        const payload = JSON.parse(u.payload);
+                        return payload[fieldKey] !== undefined && u.$id !== updateId;
+                    } catch { return false; }
+                });
+
+                for (const u of updatesToDelete) {
+                    await databases.deleteDocument('kafmap', 'pending_updates', u.$id);
+                }
 
                 showToast(t.updateVerifiedApplied);
                 setPendingVerificationState(null);
                 fetchDbPlaces();
-                setPlaceUpdates(placeUpdates.filter(u => u.$id !== updateId));
+
+                const deletedIds = new Set([updateId, ...updatesToDelete.map(u => u.$id)]);
+                setPlaceUpdates(placeUpdates.filter(u => !deletedIds.has(u.$id)));
             } catch (err) {
                 console.error(err);
                 showToast(t.failedToApplyUpdate);
@@ -465,9 +483,9 @@ export default function Home() {
     const filteredPlaces = combinedPlaces.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
     const selectedPlace = combinedPlaces.find(p => p.id === selectedId);
 
-    const pendingWcUpdate = getPendingUpdate('toiletPass');
-    const pendingWifiUpdate = getPendingUpdate('wifiPass');
-    const pendingMenuUpdate = getPendingUpdate('menu');
+    const pendingWcUpdates = getPendingUpdates('toiletPass');
+    const pendingWifiUpdates = getPendingUpdates('wifiPass');
+    const pendingMenuUpdates = getPendingUpdates('menu');
 
     const isMobileSearchVisible = isMobile && !isMobilePanelOpen && !selectedId;
 
@@ -521,7 +539,7 @@ export default function Home() {
         field: 'wc' | 'wifi' | 'menu',
         updatedAt: string | undefined | null,
         upvotes: number | undefined,
-        pendingUpdateItem: any = null,
+        pendingUpdateItems: any[] = [],
         reportMessage: string | null = null
     ) => {
         if (!updatedAt) return null;
@@ -539,7 +557,7 @@ export default function Home() {
         return (
             <div className="flex flex-col mt-3 pt-2.5 border-t border-black/5 dark:border-white/5 gap-2">
                 {/* Alerts Section */}
-                {(isOutdated || pendingUpdateItem || reportMessage) && (
+                {(isOutdated || pendingUpdateItems.length > 0 || reportMessage) && (
                     <div className="flex flex-col gap-1.5 pt-0.5">
                         {reportMessage && (
                             <button
@@ -550,8 +568,9 @@ export default function Home() {
                                 <span>{t.flagTooltip.replace('{reason}', reportMessage)}</span>
                             </button>
                         )}
-                        {pendingUpdateItem && (
+                        {pendingUpdateItems.map((pendingUpdateItem, idx) => (
                             <button
+                                key={idx}
                                 onClick={() => setPendingVerificationState({
                                     updateId: pendingUpdateItem.id,
                                     field: field === 'wc' ? 'toiletPass' : field === 'wifi' ? 'wifiPass' : 'menu',
@@ -559,13 +578,23 @@ export default function Home() {
                                     currentVerifyCount: pendingUpdateItem.verifyCount,
                                     fullPayload: pendingUpdateItem.fullPayload
                                 })}
-                                className="flex items-center gap-1.5 text-left text-[11px] font-medium text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300 transition-colors"
+                                className="flex items-center justify-between gap-1.5 text-left text-[11px] font-medium text-green-700 bg-green-50 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors px-2 py-1.5 rounded-md w-full border border-green-200/50 dark:border-green-800/50"
                             >
-                                <AlertTriangle size={12} className="shrink-0" />
-                                <span>{t.pendingUpdateVerifyHere}</span>
+                                <div className="flex items-center gap-1.5 truncate">
+                                    <AlertTriangle size={12} className="shrink-0" />
+                                    <span className="truncate">
+                                        {t.pendingUpdateVerifyHere}
+                                        {field !== 'menu' && pendingUpdateItem.value && (
+                                            <span className="ml-1 opacity-80 italic">"{pendingUpdateItem.value}"</span>
+                                        )}
+                                    </span>
+                                </div>
+                                <span className="shrink-0 flex items-center gap-1 font-bold bg-green-200 dark:bg-green-800 px-1.5 py-0.5 rounded text-[10px] text-green-800 dark:text-green-200">
+                                    {pendingUpdateItem.verifyCount || 0}/2
+                                </span>
                             </button>
-                        )}
-                        {isOutdated && !pendingUpdateItem && !reportMessage && (
+                        ))}
+                        {isOutdated && pendingUpdateItems.length === 0 && !reportMessage && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); setAlertMessage(t.infoMightBeOutdated); }}
                                 className="flex items-center gap-1.5 text-left text-[11px] font-medium text-amber-600 dark:text-amber-500 hover:text-amber-700 transition-colors"
@@ -1032,7 +1061,7 @@ export default function Home() {
                                                         <p className="text-sm font-semibold text-gray-400 italic">{t.noWC}</p>
                                                     )}
                                                 </div>
-                                                {selectedPlace.isRegistered && (selectedPlace.toiletPass && selectedPlace.toiletPass !== 'Ask to staff' && selectedPlace.toiletPass !== 'No' && selectedPlace.toiletPass !== 'None' && selectedPlace.toiletPass !== 'free' && selectedPlace.toiletPass !== 'ücretsiz' && selectedPlace.toiletPass !== 'ucretsiz' && selectedPlace.toiletPass !== 'Free' && selectedPlace.toiletPass !== 'Ücretsiz' && selectedPlace.toiletPass !== 'Ucretsiz') && renderVerificationFooter('wc', selectedPlace.wcUpdatedAt, selectedPlace.wcUpvotes, pendingWcUpdate, hasReport('wcPasswordIncorrect') ? t.wcPasswordIncorrect : null)}
+                                                {selectedPlace.isRegistered && (selectedPlace.toiletPass && selectedPlace.toiletPass !== 'Ask to staff' && selectedPlace.toiletPass !== 'No' && selectedPlace.toiletPass !== 'None' && selectedPlace.toiletPass !== 'free' && selectedPlace.toiletPass !== 'ücretsiz' && selectedPlace.toiletPass !== 'ucretsiz' && selectedPlace.toiletPass !== 'Free' && selectedPlace.toiletPass !== 'Ücretsiz' && selectedPlace.toiletPass !== 'Ucretsiz') && renderVerificationFooter('wc', selectedPlace.wcUpdatedAt, selectedPlace.wcUpvotes, pendingWcUpdates, hasReport('wcPasswordIncorrect') ? t.wcPasswordIncorrect : null)}
                                             </div>
                                         </div>
 
@@ -1062,7 +1091,7 @@ export default function Home() {
                                                         </button>
                                                     )}
                                                 </div>
-                                                {selectedPlace.isRegistered && (selectedPlace.wifiPass && selectedPlace.wifiPass !== 'No' && selectedPlace.wifiPass !== 'None' && selectedPlace.wifiPass !== 'Free' && selectedPlace.wifiPass !== 'Open' && selectedPlace.wifiPass !== 'Ask to staff') && renderVerificationFooter('wifi', selectedPlace.wifiUpdatedAt, selectedPlace.wifiUpvotes, pendingWifiUpdate, hasReport('wifiPasswordIncorrect') ? t.wifiPasswordIncorrect : null)}
+                                                {selectedPlace.isRegistered && (selectedPlace.wifiPass && selectedPlace.wifiPass !== 'No' && selectedPlace.wifiPass !== 'None' && selectedPlace.wifiPass !== 'Free' && selectedPlace.wifiPass !== 'Open' && selectedPlace.wifiPass !== 'Ask to staff') && renderVerificationFooter('wifi', selectedPlace.wifiUpdatedAt, selectedPlace.wifiUpvotes, pendingWifiUpdates, hasReport('wifiPasswordIncorrect') ? t.wifiPasswordIncorrect : null)}
                                             </div>
                                         </div>
                                     </div>
@@ -1113,7 +1142,7 @@ export default function Home() {
                                                 )}
                                             </div>
                                         )}
-                                        {selectedPlace.isRegistered && (selectedPlace.menu.length > 0 || selectedPlace.menuUrl) && renderVerificationFooter('menu', selectedPlace.menuUpdatedAt, selectedPlace.menuUpvotes, pendingMenuUpdate, hasReport('menuPricesOutdated') ? t.menuPricesOutdated : null)}
+                                        {selectedPlace.isRegistered && (selectedPlace.menu.length > 0 || selectedPlace.menuUrl) && renderVerificationFooter('menu', selectedPlace.menuUpdatedAt, selectedPlace.menuUpvotes, pendingMenuUpdates, hasReport('menuPricesOutdated') ? t.menuPricesOutdated : null)}
                                     </div>
 
                                     {/* Action Button Removed -> Use Pencils Instead */}

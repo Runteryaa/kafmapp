@@ -10,6 +10,7 @@
     "pages:build": "npx -y @cloudflare/next-on-pages@1.13.16"
   },
   "dependencies": {
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@radix-ui/react-toast": "^1.2.15",
     "appwrite": "^22.4.1",
     "framer-motion": "^12.34.3",

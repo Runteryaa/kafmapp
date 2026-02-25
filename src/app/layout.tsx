@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "kaf'map - Toilet Passwords & Menus",
   description: "Find toilet passwords and menu prices for cafes and restaurants.",
+  manifest: '/manifest.json',
 };
 
 export const viewport: Viewport = {
@@ -36,8 +37,17 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-800 overflow-hidden w-screen h-screen flex flex-col md:flex-row font-sans`}
       >
         <AuthProvider>
-            {children}
+          {children}
         </AuthProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof navigator.serviceWorker !== 'undefined') {
+                navigator.serviceWorker.register('/sw.js')
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );

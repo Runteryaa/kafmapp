@@ -4,16 +4,13 @@
       <stop offset="0%" stop-color="#2c3545" />
       <stop offset="100%" stop-color="#141922" />
     </linearGradient>
-
     <linearGradient id="coffee" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#462a17" />
       <stop offset="100%" stop-color="#1b0c05" />
     </linearGradient>
-
     <clipPath id="split">
       <rect x="256" y="0" width="256" height="512" />
     </clipPath>
-
     <path id="pin" d="M 121 200 L 146 200 A 110 110 0 0 0 358 240 L 385 240 C 385 330, 290 420, 256 475 C 222 420, 121 330, 121 200 Z" />
     <rect id="handle" x="300" y="170" width="85" height="46" rx="23" />
     <circle id="mug" cx="256" cy="200" r="90" />
@@ -33,10 +30,8 @@
 
   <circle cx="256" cy="200" r="74" fill="#784421" />
   <circle cx="256" cy="200" r="74" fill="#522a10" clip-path="url(#split)" />
-
   <circle cx="256" cy="200" r="62" fill="url(#coffee)" />
-
+  
   <path d="M 215 155 A 48 48 0 0 0 215 245 A 58 58 0 0 1 215 155 Z" fill="#9c5f35" opacity="0.6" />
-
   <path d="M 256 115 C 240 95, 280 70, 256 40 C 265 60, 245 80, 256 115 Z" fill="#f8edeb" opacity="0.85" />
 </svg>

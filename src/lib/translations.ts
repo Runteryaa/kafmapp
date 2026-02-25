@@ -88,6 +88,7 @@ export const t = {
         backToMap: 'Back to Map',
         signInToAccount: 'Sign in to your account',
         emailAddress: 'Email address',
+        username: 'Username'
         password: 'Password',
         rememberMe: 'Remember me',
         forgotPassword: 'Forgot your password?',
@@ -208,6 +209,7 @@ export const t = {
         backToMap: 'Haritaya Dön',
         signInToAccount: 'Hesabınıza giriş yapın',
         emailAddress: 'E-posta adresi',
+        username: 'Kullanıcı Adı'
         password: 'Şifre',
         rememberMe: 'Beni hatırla',
         forgotPassword: 'Şifrenizi mi unuttunuz?',

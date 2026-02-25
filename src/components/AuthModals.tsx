@@ -188,7 +188,7 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin, t }: { isOpen:
                             )}
                             <div>
                                 <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Full Name
+                                    {t.username}
                                 </label>
                                 <div className="mt-1">
                                     <input

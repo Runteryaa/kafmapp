@@ -91,9 +91,26 @@ export default function MapComponent({
         if (selectedChanged) {
             prevSelectedId.current = selectedId;
             if (selectedPlace) {
-                const latOffset = isMobile ? -0.0020 : 0;
                 const targetZoom = Math.max(map.getZoom(), 16);
-                map.setView([selectedPlace.lat + latOffset, selectedPlace.lng], targetZoom, { animate: true, duration: 0.5 });
+
+                if (isMobile) {
+                    // Mobile: Center logic with drawer offset
+                    // First set view to target zoom to ensure projection is accurate
+                    map.setView([selectedPlace.lat, selectedPlace.lng], targetZoom, { animate: false });
+
+                    // Delay slightly to let the map settle, then offset
+                    setTimeout(() => {
+                        const point = map.latLngToContainerPoint([selectedPlace.lat, selectedPlace.lng]);
+                        // Shift center down by 25% of screen height (to move pin up)
+                        const newPoint = L.point(point.x, point.y + (window.innerHeight * 0.25));
+                        const newCenter = map.containerPointToLatLng(newPoint);
+
+                        map.panTo(newCenter, { animate: true, duration: 0.5 });
+                    }, 100);
+                } else {
+                    // Desktop: Strict center
+                    map.setView([selectedPlace.lat, selectedPlace.lng], targetZoom, { animate: true, duration: 0.5 });
+                }
             }
         }
 

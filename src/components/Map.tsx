@@ -284,8 +284,10 @@ export default function MapComponent({
             )}
 
             <MapContainer
-                center={userLocation ? [userLocation.lat, userLocation.lng] : [40.0375, 32.8945]}
-                zoom={15}
+                // Centers on Turkey (39.0, 35.0) if userLocation is not yet available
+                center={userLocation ? [userLocation.lat, userLocation.lng] : [39.0, 35.0]}
+                // Use zoom level 6 for the whole country, or 15 if we have the user's exact location
+                zoom={userLocation ? 15 : 6}
                 zoomControl={false}
                 scrollWheelZoom={true}
                 style={{ height: "100%", width: "100%", zIndex: 0, background: theme === 'dark' ? '#1f2937' : '#f3f4f6' }}

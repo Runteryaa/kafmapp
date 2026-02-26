@@ -79,49 +79,57 @@ export default function MapComponent({
 
         const flyChanged = flyToLocation && (!prevFlyTo.current || flyToLocation.lat !== prevFlyTo.current.lat || flyToLocation.lng !== prevFlyTo.current.lng);
         const selectedChanged = selectedId !== prevSelectedId.current;
-        const becameSelected = selectedChanged && selectedId !== null;
 
-        if (flyChanged) {
-            prevFlyTo.current = flyToLocation;
-            if (!becameSelected) {
-                map.setView([flyToLocation.lat, flyToLocation.lng], 15, { animate: true, duration: 1.5 });
-            }
-        }
+        // Unified logic for map movement
+        if (flyChanged || selectedChanged) {
+            // Update refs
+            if (flyChanged) prevFlyTo.current = flyToLocation;
+            if (selectedChanged) prevSelectedId.current = selectedId;
 
-        if (selectedChanged) {
-            prevSelectedId.current = selectedId;
+            // Determine target
+            let targetLat: number | null = null;
+            let targetLng: number | null = null;
+            let isSelectionTarget = false;
+
+            // Priority: Selection > FlyTo
             if (selectedPlace) {
-                const targetZoom = Math.max(map.getZoom(), 16);
+                targetLat = selectedPlace.lat;
+                targetLng = selectedPlace.lng;
+                isSelectionTarget = true;
+            } else if (flyToLocation) {
+                targetLat = flyToLocation.lat;
+                targetLng = flyToLocation.lng;
+            }
 
-                if (isMobile) {
-                    // Mobile: Center logic with drawer offset
-                    // First set view to target zoom to ensure projection is accurate
-                    map.setView([selectedPlace.lat, selectedPlace.lng], targetZoom, { animate: false });
+            // Execute move if we have a target
+            if (targetLat !== null && targetLng !== null) {
+                const targetZoom = isSelectionTarget ? Math.max(map.getZoom(), 16) : 15;
 
-                    // Delay slightly to let the map settle, then offset
-                    setTimeout(() => {
-                        const point = map.latLngToContainerPoint([selectedPlace.lat, selectedPlace.lng]);
-                        // Shift center down by 25% of screen height (to move pin up)
+                if (isMobile && isSelectionTarget) {
+                    // Mobile Selection: Use robust pixel-based offset
+                    // 1. Instantly center to target (no animation) to ensure accurate projection
+                    map.setView([targetLat, targetLng], targetZoom, { animate: false });
+
+                    // 2. Calculate offset and pan smoothly
+                    // Using requestAnimationFrame to wait for potential layout shifts (drawer)
+                    requestAnimationFrame(() => {
+                        const point = map.latLngToContainerPoint([targetLat, targetLng]);
+                        // Shift center down by 25% of viewport height => pushes pin UP
                         const newPoint = L.point(point.x, point.y + (window.innerHeight * 0.25));
                         const newCenter = map.containerPointToLatLng(newPoint);
-
                         map.panTo(newCenter, { animate: true, duration: 0.5 });
-                    }, 100);
+                    });
                 } else {
-                    // Desktop: Strict center
-                    map.setView([selectedPlace.lat, selectedPlace.lng], targetZoom, { animate: true, duration: 0.5 });
+                    // Desktop or Generic FlyTo: Strict centering
+                    map.setView([targetLat, targetLng], targetZoom, { animate: true, duration: 1.0 });
                 }
             }
-        }
-
-        if (!flyToLocation && !selectedPlace) {
-            // Manage initial panning without locking the user's camera permanently
+        } else if (!flyToLocation && !selectedPlace) {
+            // Initial Load Logic
             if (userLocation && !initialGpsPanDone.current) {
-                // Real GPS arrived! Center map on it (overriding IP pan if it happened)
                 map.setView([userLocation.lat, userLocation.lng], 15, { animate: true });
                 initialGpsPanDone.current = true;
             } else if (ipLocation && !userLocation && !initialIpPanDone.current) {
-                // IP location arrived first. Pan here temporarily while waiting for GPS.
                 map.setView([ipLocation.lat, ipLocation.lng], 15, { animate: true });
                 initialIpPanDone.current = true;
             }

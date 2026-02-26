@@ -86,14 +86,20 @@ export default function MapComponent({
             if (!becameSelected) {
                 map.setView([flyToLocation.lat, flyToLocation.lng], 15, { animate: true, duration: 1.5 });
             }
-        } else if (selectedChanged) {
+        }
+
+        if (selectedChanged) {
             prevSelectedId.current = selectedId;
             if (selectedPlace) {
-                const latOffset = isMobile ? -0.0035 : 0;
+                // Determine effective offset based on drawer state if needed,
+                // but for now user requested strict centering.
+                const latOffset = 0;
                 const targetZoom = Math.max(map.getZoom(), 16);
                 map.setView([selectedPlace.lat + latOffset, selectedPlace.lng], targetZoom, { animate: true, duration: 0.5 });
             }
-        } else if (!flyToLocation && !selectedPlace) {
+        }
+
+        if (!flyToLocation && !selectedPlace) {
             // Manage initial panning without locking the user's camera permanently
             if (userLocation && !initialGpsPanDone.current) {
                 // Real GPS arrived! Center map on it (overriding IP pan if it happened)

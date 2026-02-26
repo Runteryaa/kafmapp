@@ -22,13 +22,10 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: "Kaf'Map",
   },
-  icons: {
-    icon: '/icon.png',
-    apple: '/apple-icon.png',
-  },
 };
 
 export const viewport: Viewport = {
+  themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

@@ -91,9 +91,7 @@ export default function MapComponent({
         if (selectedChanged) {
             prevSelectedId.current = selectedId;
             if (selectedPlace) {
-                // Determine effective offset based on drawer state if needed,
-                // but for now user requested strict centering.
-                const latOffset = 0;
+                const latOffset = isMobile ? -0.0020 : 0;
                 const targetZoom = Math.max(map.getZoom(), 16);
                 map.setView([selectedPlace.lat + latOffset, selectedPlace.lng], targetZoom, { animate: true, duration: 0.5 });
             }

@@ -17,6 +17,15 @@ export const metadata: Metadata = {
   title: "Kaf'Map - Toilet Passwords & Menus",
   description: "Find toilet passwords and menu prices for cafes and restaurants.",
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: "Kaf'Map",
+  },
+  icons: {
+    icon: '/icon.png',
+    apple: '/apple-icon.png',
+  },
 };
 
 export const viewport: Viewport = {

@@ -42,31 +42,98 @@ export function UpdateInfoModal({
 
         const filteredMenu = menu.filter(m => m.item.trim() !== '' && m.price.trim() !== '');
 
-        // Construct the base payload
-        const payload: any = {
-            placeId: place.id.toString(),
-            name: place.name,
-            lat: place.lat.toString(),
-            lng: place.lng.toString(),
-            type: place.type,
-            address: place.address,
-            toiletPass: toiletPass.trim() || null,
-            wifiPass: wifiPass.trim() || null,
-            menuUrl: menuUrl.trim() || null,
-            menu: JSON.stringify(filteredMenu),
+        // 1. Determine changes
+        const currentToiletPass = place.toiletPass || null;
+        const currentWifiPass = place.wifiPass || null;
+        const currentMenuUrl = place.menuUrl || null;
+        const currentMenu = JSON.stringify(place.menu || []);
+
+        const newToiletPass = toiletPass.trim() || null;
+        const newWifiPass = wifiPass.trim() || null;
+        const newMenuUrl = menuUrl.trim() || null;
+        const newMenu = JSON.stringify(filteredMenu);
+
+        const isWcChanged = currentToiletPass !== newToiletPass;
+        const isWifiChanged = currentWifiPass !== newWifiPass;
+        const isMenuUrlChanged = currentMenuUrl !== newMenuUrl;
+        const isMenuChanged = currentMenu !== newMenu;
+
+        // 2. Check for auto-approval (Free/Open)
+        const isFree = (val: string | null) => {
+            if (!val) return false;
+            const lower = val.toLowerCase().trim();
+            return ['free', 'open', 'public', 'no password', 'ücretsiz', 'ucretsiz'].includes(lower);
         };
 
+        const wcAuto = isWcChanged && isFree(newToiletPass);
+        const wifiAuto = isWifiChanged && isFree(newWifiPass);
+
         try {
-            // Submit changes to the pending_updates collection for admin approval
-            await databases.createDocument('kafmap', 'pending_updates', ID.unique(), {
-                placeId: place.id.toString(),
-                placeName: place.name,
-                type: 'update',
-                payload: JSON.stringify(payload)
-            });
+            // 3. Apply Direct Updates
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const directUpdatePayload: any = {};
+            if (wcAuto) {
+                directUpdatePayload.toiletPass = newToiletPass;
+                directUpdatePayload.wcUpvotes = 0;
+                directUpdatePayload.wcUpdatedAt = new Date().toISOString();
+            }
+            if (wifiAuto) {
+                directUpdatePayload.wifiPass = newWifiPass;
+                directUpdatePayload.wifiUpvotes = 0;
+                directUpdatePayload.wifiUpdatedAt = new Date().toISOString();
+            }
+
+            if (Object.keys(directUpdatePayload).length > 0) {
+                const docId = `place_${place.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+                try {
+                    await databases.updateDocument('kafmap', 'places', docId, directUpdatePayload);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                } catch (e: any) {
+                    if (e.code === 404) {
+                        await databases.createDocument('kafmap', 'places', docId, {
+                            placeId: place.id.toString(),
+                            name: place.name,
+                            lat: place.lat.toString(),
+                            lng: place.lng.toString(),
+                            type: place.type,
+                            address: place.address,
+                            ratingSum: "0",
+                            ratingCount: "0",
+                            ...directUpdatePayload
+                        });
+                    } else throw e;
+                }
+            }
+
+            // 4. Send Pending Updates (if non-auto changes exist)
+            const needsPending = (isWcChanged && !wcAuto) || (isWifiChanged && !wifiAuto) || isMenuUrlChanged || isMenuChanged;
+
+            if (needsPending) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const payload: any = {
+                    placeId: place.id.toString(),
+                    name: place.name,
+                    lat: place.lat.toString(),
+                    lng: place.lng.toString(),
+                    type: place.type,
+                    address: place.address,
+                    toiletPass: newToiletPass,
+                    wifiPass: newWifiPass,
+                    menuUrl: newMenuUrl,
+                    menu: newMenu,
+                };
+
+                await databases.createDocument('kafmap', 'pending_updates', ID.unique(), {
+                    placeId: place.id.toString(),
+                    placeName: place.name,
+                    type: 'update',
+                    payload: JSON.stringify(payload)
+                });
+            }
 
             onSuccess();
             onClose();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Failed to save data. Please check database configuration.");

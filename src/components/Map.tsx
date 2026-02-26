@@ -89,7 +89,7 @@ export default function MapComponent({
         } else if (selectedChanged) {
             prevSelectedId.current = selectedId;
             if (selectedPlace) {
-                const latOffset = isMobile ? -0.002 : 0;
+                const latOffset = isMobile ? -0.001 : 0;
                 const targetZoom = Math.max(map.getZoom(), 17);
                 map.setView([selectedPlace.lat + latOffset, selectedPlace.lng], targetZoom, { animate: true, duration: 0.5 });
             }

@@ -86,14 +86,35 @@ export default function MapComponent({
             if (!becameSelected) {
                 map.setView([flyToLocation.lat, flyToLocation.lng], 15, { animate: true, duration: 1.5 });
             }
-        } else if (selectedChanged) {
+        }
+
+        if (selectedChanged) {
             prevSelectedId.current = selectedId;
             if (selectedPlace) {
-                const latOffset = isMobile ? -0.002 : 0;
-                const targetZoom = Math.max(map.getZoom(), 17);
-                map.setView([selectedPlace.lat + latOffset, selectedPlace.lng], targetZoom, { animate: true, duration: 0.5 });
+                const targetZoom = Math.max(map.getZoom(), 16);
+
+                if (isMobile) {
+                    // Mobile: Center logic with drawer offset
+                    // First set view to target zoom to ensure projection is accurate
+                    map.setView([selectedPlace.lat, selectedPlace.lng], targetZoom, { animate: false });
+
+                    // Delay slightly to let the map settle, then offset
+                    setTimeout(() => {
+                        const point = map.latLngToContainerPoint([selectedPlace.lat, selectedPlace.lng]);
+                        // Shift center down by 25% of screen height (to move pin up)
+                        const newPoint = L.point(point.x, point.y + (window.innerHeight * 0.25));
+                        const newCenter = map.containerPointToLatLng(newPoint);
+
+                        map.panTo(newCenter, { animate: true, duration: 0.5 });
+                    }, 100);
+                } else {
+                    // Desktop: Strict center
+                    map.setView([selectedPlace.lat, selectedPlace.lng], targetZoom, { animate: true, duration: 0.5 });
+                }
             }
-        } else if (!flyToLocation && !selectedPlace) {
+        }
+
+        if (!flyToLocation && !selectedPlace) {
             // Manage initial panning without locking the user's camera permanently
             if (userLocation && !initialGpsPanDone.current) {
                 // Real GPS arrived! Center map on it (overriding IP pan if it happened)

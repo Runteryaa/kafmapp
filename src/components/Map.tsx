@@ -34,6 +34,9 @@ export default function MapComponent({
     const [map, setMap] = useState<any>(null);
     const selectedPlace = places.find(p => p.id === selectedId);
     const [currentZoom, setCurrentZoom] = useState(15);
+    
+    // IP Geolocation fallback state
+    const [ipLocation, setIpLocation] = useState<LocationState | null>(null);
 
     const fetchRef = useRef<number | null>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,6 +44,32 @@ export default function MapComponent({
 
     const prevFlyTo = useRef<LocationState | null>(null);
     const prevSelectedId = useRef<number | null>(null);
+
+    // Fetch IP Location on Mount
+    useEffect(() => {
+        const fetchIpLocation = async () => {
+            try {
+                // Using geojs.io - a free, no-key IP geolocation API with CORS support
+                const res = await fetch('https://get.geojs.io/v1/ip/geo.json');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.latitude && data.longitude) {
+                        setIpLocation({
+                            lat: parseFloat(data.latitude),
+                            lng: parseFloat(data.longitude)
+                        });
+                    }
+                }
+            } catch (error) {
+                console.warn("IP Geolocation failed:", error);
+            }
+        };
+
+        fetchIpLocation();
+    }, []);
+
+    // Determine which location to use: GPS is preferred, IP is fallback
+    const effectiveLocation = userLocation || ipLocation;
 
     // Map Controller Effect
     useEffect(() => {
@@ -66,10 +95,11 @@ export default function MapComponent({
             }
         }
 
-        if (!flyToLocation && !selectedPlace && userLocation && !prevFlyTo.current && !prevSelectedId.current) {
-            map.setView([userLocation.lat, userLocation.lng], 15, { animate: true });
+        // Use effectiveLocation instead of just userLocation
+        if (!flyToLocation && !selectedPlace && effectiveLocation && !prevFlyTo.current && !prevSelectedId.current) {
+            map.setView([effectiveLocation.lat, effectiveLocation.lng], 15, { animate: true });
         }
-    }, [map, flyToLocation, selectedPlace, selectedId, isMobile, userLocation]);
+    }, [map, flyToLocation, selectedPlace, selectedId, isMobile, effectiveLocation]);
 
     // Overpass Fetcher
     const fetchPlaces = async (force: boolean = false) => {
@@ -207,9 +237,6 @@ export default function MapComponent({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [manualTrigger]);
 
-
-
-
     const getCustomIcon = (type: string, isUnclaimed: boolean) => {
         let bgColor;
         let iconHtml;
@@ -284,10 +311,8 @@ export default function MapComponent({
             )}
 
             <MapContainer
-                // Centers on Turkey (39.0, 35.0) if userLocation is not yet available
-                center={userLocation ? [userLocation.lat, userLocation.lng] : [39.0, 35.0]}
-                // Use zoom level 6 for the whole country, or 15 if we have the user's exact location
-                zoom={userLocation ? 15 : 6}
+                center={effectiveLocation ? [effectiveLocation.lat, effectiveLocation.lng] : [39.0, 35.0]}
+                zoom={effectiveLocation ? 15 : 6}
                 zoomControl={false}
                 scrollWheelZoom={true}
                 style={{ height: "100%", width: "100%", zIndex: 0, background: theme === 'dark' ? '#1f2937' : '#f3f4f6' }}
@@ -320,11 +345,11 @@ export default function MapComponent({
                     )
                 })}
 
-                {userLocation && (
+                {effectiveLocation && (
                     <>
-                        <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon} />
+                        <Marker position={[effectiveLocation.lat, effectiveLocation.lng]} icon={userIcon} />
                         <Circle
-                            center={[userLocation.lat, userLocation.lng]}
+                            center={[effectiveLocation.lat, effectiveLocation.lng]}
                             pathOptions={{ fillColor: '#3b82f6', fillOpacity: 0.1, color: 'transparent' }}
                             radius={150}
                         />
@@ -334,3 +359,4 @@ export default function MapComponent({
         </div>
     );
 }
+

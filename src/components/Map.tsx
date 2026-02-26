@@ -44,6 +44,8 @@ export default function MapComponent({
 
     const prevFlyTo = useRef<LocationState | null>(null);
     const prevSelectedId = useRef<number | null>(null);
+    const initialIpPanDone = useRef(false);
+    const initialGpsPanDone = useRef(false);
 
     // Fetch IP Location on Mount
     useEffect(() => {
@@ -84,22 +86,26 @@ export default function MapComponent({
             if (!becameSelected) {
                 map.setView([flyToLocation.lat, flyToLocation.lng], 15, { animate: true, duration: 1.5 });
             }
-        }
-
-        if (selectedChanged) {
+        } else if (selectedChanged) {
             prevSelectedId.current = selectedId;
             if (selectedPlace) {
                 const latOffset = isMobile ? -0.002 : 0;
                 const targetZoom = Math.max(map.getZoom(), 17);
                 map.setView([selectedPlace.lat + latOffset, selectedPlace.lng], targetZoom, { animate: true, duration: 0.5 });
             }
+        } else if (!flyToLocation && !selectedPlace) {
+            // Manage initial panning without locking the user's camera permanently
+            if (userLocation && !initialGpsPanDone.current) {
+                // Real GPS arrived! Center map on it (overriding IP pan if it happened)
+                map.setView([userLocation.lat, userLocation.lng], 15, { animate: true });
+                initialGpsPanDone.current = true;
+            } else if (ipLocation && !userLocation && !initialIpPanDone.current) {
+                // IP location arrived first. Pan here temporarily while waiting for GPS.
+                map.setView([ipLocation.lat, ipLocation.lng], 15, { animate: true });
+                initialIpPanDone.current = true;
+            }
         }
-
-        // Use effectiveLocation instead of just userLocation
-        if (!flyToLocation && !selectedPlace && effectiveLocation && !prevFlyTo.current && !prevSelectedId.current) {
-            map.setView([effectiveLocation.lat, effectiveLocation.lng], 15, { animate: true });
-        }
-    }, [map, flyToLocation, selectedPlace, selectedId, isMobile, effectiveLocation]);
+    }, [map, flyToLocation, selectedPlace, selectedId, isMobile, ipLocation, userLocation]);
 
     // Overpass Fetcher
     const fetchPlaces = async (force: boolean = false) => {
@@ -359,4 +365,5 @@ export default function MapComponent({
         </div>
     );
 }
+
 

@@ -112,30 +112,35 @@ export default function Home() {
     const [placeReports, setPlaceReports] = useState<any[]>([]);
     const [placeUpdates, setPlaceUpdates] = useState<any[]>([]);
 
-    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstallable, setIsInstallable] = useState(false);
 
-    
     useEffect(() => {
-        if (typeof window !== 'undefined' && 'install' in navigator) {
-            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-            if (!isStandalone) {
+        if (typeof window !== 'undefined') {
+            if ('install' in navigator) {
+                const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+                if (!isStandalone) {
+                    setIsInstallable(true);
+                }
+            }
+
+            // Check if event was already captured by layout script
+            if ((window as any).deferredPrompt) {
                 setIsInstallable(true);
             }
         }
 
         const handleBeforeInstallPrompt = (e: any) => {
             e.preventDefault();
-            setDeferredPrompt(e);
+            (window as any).deferredPrompt = e;
             setIsInstallable(true);
         };
-        
+
         window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
         return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     }, []);
 
     const handleInstallClick = async () => {
-        if ('install' in navigator) {
+        if (typeof window !== 'undefined' && 'install' in navigator) {
             try {
                 await (navigator as any).install();
                 setIsInstallable(false);
@@ -145,11 +150,13 @@ export default function Home() {
             }
         }
 
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
+        const promptEvent = typeof window !== 'undefined' ? (window as any).deferredPrompt : null;
+        if (!promptEvent) return;
+
+        promptEvent.prompt();
+        const { outcome } = await promptEvent.userChoice;
         if (outcome === 'accepted') {
-            setDeferredPrompt(null);
+            (window as any).deferredPrompt = null;
             setIsInstallable(false);
         }
     };
@@ -1041,10 +1048,10 @@ export default function Home() {
                 >
                     <div className="flex items-center gap-2">
                         <div className="flex items-center justify-center bg-transparent">
-                            <img 
-                                src="/kafmap.svg" 
+                            <img
+                                src="/kafmap.svg"
                                 alt="Kaf'Map Icon"
-                                className="w-10 h-10 bg-transparent object-contain drop-shadow-sm" 
+                                className="w-10 h-10 bg-transparent object-contain drop-shadow-sm"
                             />
                         </div>
                         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">

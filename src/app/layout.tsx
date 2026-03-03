@@ -54,6 +54,10 @@ export default function RootLayout({
               if (typeof navigator.serviceWorker !== 'undefined') {
                 navigator.serviceWorker.register('/sw.js')
               }
+              window.addEventListener('beforeinstallprompt', function(e) {
+                e.preventDefault();
+                window.deferredPrompt = e;
+              });
             `,
           }}
         />

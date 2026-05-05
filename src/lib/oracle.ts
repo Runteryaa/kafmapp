@@ -32,7 +32,8 @@ export async function getPlaces(filters?: {
         let parsedMenu = [];
         if (item.menu) {
             try {
-                parsedMenu = JSON.parse(item.menu);
+                // The API might return menu as a string, try parsing
+                parsedMenu = typeof item.menu === 'string' ? JSON.parse(item.menu) : item.menu;
             } catch (e) {
                 console.error("Failed to parse menu JSON:", e);
             }

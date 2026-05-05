@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Loader2, Save, Link } from 'lucide-react';
-import { databases } from '../lib/appwrite';
 import { Place } from '../lib/types';
-import { ID } from 'appwrite';
+import { createUpdate } from '../lib/oracle';
 
 export function UpdateInfoModal({
     isOpen,
@@ -58,9 +57,9 @@ export function UpdateInfoModal({
 
         try {
             // Submit changes to the pending_updates collection for admin approval
-            await databases.createDocument('kafmap', 'pending_updates', ID.unique(), {
-                placeId: place.id.toString(),
-                placeName: place.name,
+            await createUpdate({
+                placeid: place.id.toString(),
+                placename: place.name,
                 type: 'update',
                 payload: JSON.stringify(payload)
             });

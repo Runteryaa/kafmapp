@@ -14,6 +14,7 @@ import ReportModal from "../components/ReportModal"; // Import report modal
 import { client, databases } from "../lib/appwrite"; // Import appwrite client
 import { ID, Query } from "appwrite"; // Import appwrite ID and Query
 import { useAuth } from "../hooks/useAuth";
+import { getPlaces } from "../lib/oracle";
 import { getTranslation } from "../lib/translations";
 
 // Dynamically import the Map component with ssr: false
@@ -275,7 +276,19 @@ export default function Home() {
 
                 showToast(t.updateVerifiedApplied);
                 setPendingVerificationState(null);
-                fetchDbPlaces();
+                if (mapInstance) {
+                    const bounds = mapInstance.getBounds();
+                    fetchDbPlaces({
+                        bounds: {
+                            minLat: bounds.getSouthWest().lat,
+                            maxLat: bounds.getNorthEast().lat,
+                            minLng: bounds.getSouthWest().lng,
+                            maxLng: bounds.getNorthEast().lng
+                        }
+                    });
+                } else {
+                    fetchDbPlaces();
+                }
 
                 const deletedIds = new Set([updateId, ...updatesToDelete.map(u => u.$id)]);
                 setPlaceUpdates(placeUpdates.filter(u => !deletedIds.has(u.$id)));
@@ -303,31 +316,10 @@ export default function Home() {
         }
     };
 
-    // Fetch places data from Appwrite DB and construct full Place objects
-    const fetchDbPlaces = async () => {
+    // Fetch places data from Oracle DB and construct full Place objects
+    const fetchDbPlaces = async (filters?: { search?: string; bounds?: { minLat: number; maxLat: number; minLng: number; maxLng: number } }) => {
         try {
-            const response = await databases.listDocuments('kafmap', 'places');
-            const placesList: Place[] = response.documents.map((doc: any) => ({
-                id: parseInt(doc.placeId),
-                name: doc.name,
-                lat: doc.lat ? parseFloat(doc.lat.toString()) : 0, // Explicitly parse float for coordinates
-                lng: doc.lng ? parseFloat(doc.lng.toString()) : 0,
-                type: doc.type || 'restaurant',
-                address: doc.address || '',
-                toiletPass: doc.toiletPass,
-                wifiPass: doc.wifiPass,
-                menuUrl: doc.menuUrl || null,
-                // Calculate average rating from ratingSum and ratingCount
-                rating: Number(doc.ratingCount) > 0 ? Number(doc.ratingSum) / Number(doc.ratingCount) : 0,
-                menu: doc.menu ? JSON.parse(doc.menu) : [],
-                isRegistered: true,
-                wcUpdatedAt: doc.wcUpdatedAt || doc.$updatedAt,
-                wcUpvotes: doc.wcUpvotes || 0,
-                wifiUpdatedAt: doc.wifiUpdatedAt || doc.$updatedAt,
-                wifiUpvotes: doc.wifiUpvotes || 0,
-                menuUpdatedAt: doc.menuUpdatedAt || doc.$updatedAt,
-                menuUpvotes: doc.menuUpvotes || 0,
-            }));
+            const placesList = await getPlaces(filters);
             setDbPlaces(placesList);
         } catch (error) {
             console.error("Failed to fetch places from DB:", error);
@@ -337,6 +329,34 @@ export default function Home() {
     useEffect(() => {
         fetchDbPlaces();
     }, []);
+
+    // Hook into mapInstance bounds changes and map movements
+    useEffect(() => {
+        if (!mapInstance) return;
+
+        const handleMapMove = () => {
+            const bounds = mapInstance.getBounds();
+            const filters = {
+                bounds: {
+                    minLat: bounds.getSouthWest().lat,
+                    maxLat: bounds.getNorthEast().lat,
+                    minLng: bounds.getSouthWest().lng,
+                    maxLng: bounds.getNorthEast().lng
+                }
+            };
+            fetchDbPlaces(filters);
+        };
+
+        // Listen for moveend events to fetch data
+        mapInstance.on('moveend', handleMapMove);
+
+        // Initial fetch with current bounds
+        handleMapMove();
+
+        return () => {
+            mapInstance.off('moveend', handleMapMove);
+        };
+    }, [mapInstance]);
 
     // Load theme from local storage
     useEffect(() => {
@@ -454,7 +474,19 @@ export default function Home() {
             localStorage.setItem(ratedKey, "true");
 
             showToast(t.ratingSubmitted);
-            fetchDbPlaces(); // Refresh local data
+            if (mapInstance) {
+                const bounds = mapInstance.getBounds();
+                fetchDbPlaces({
+                    bounds: {
+                        minLat: bounds.getSouthWest().lat,
+                        maxLat: bounds.getNorthEast().lat,
+                        minLng: bounds.getSouthWest().lng,
+                        maxLng: bounds.getNorthEast().lng
+                    }
+                });
+            } else {
+                fetchDbPlaces(); // Refresh local data
+            }
         } catch (err) {
             console.error("Rating failed", err);
             showToast(t.failedRating);
@@ -492,7 +524,19 @@ export default function Home() {
             await databases.updateDocument('kafmap', 'places', docId, updatePayload);
             localStorage.setItem(verifyKey, "true");
             showToast(t.verificationSubmitted);
-            fetchDbPlaces(); // Refresh local data
+            if (mapInstance) {
+                const bounds = mapInstance.getBounds();
+                fetchDbPlaces({
+                    bounds: {
+                        minLat: bounds.getSouthWest().lat,
+                        maxLat: bounds.getNorthEast().lat,
+                        minLng: bounds.getSouthWest().lng,
+                        maxLng: bounds.getNorthEast().lng
+                    }
+                });
+            } else {
+                fetchDbPlaces(); // Refresh local data
+            }
         } catch (err) {
             console.error("Verification failed", err);
             showToast(t.failedToSubmitVerification);
@@ -763,7 +807,24 @@ export default function Home() {
     const handleGlobalSearch = async (e: React.KeyboardEvent<HTMLInputElement> | React.ChangeEvent<HTMLInputElement>) => {
         // Just standard search filtering if it's a typing event
         if ('target' in e && !('key' in e)) {
-            setSearchQuery((e.target as HTMLInputElement).value);
+            const query = (e.target as HTMLInputElement).value;
+            setSearchQuery(query);
+            // Fetch DB places matching the search query if it's not empty, otherwise fetch bounds
+            if (query.trim() !== '') {
+                fetchDbPlaces({ search: query });
+            } else if (mapInstance) {
+                const bounds = mapInstance.getBounds();
+                fetchDbPlaces({
+                    bounds: {
+                        minLat: bounds.getSouthWest().lat,
+                        maxLat: bounds.getNorthEast().lat,
+                        minLng: bounds.getSouthWest().lng,
+                        maxLng: bounds.getNorthEast().lng
+                    }
+                });
+            } else {
+                fetchDbPlaces();
+            }
             return;
         }
 
@@ -993,7 +1054,19 @@ export default function Home() {
                 onClose={() => setIsUpdateModalOpen(false)}
                 place={selectedPlace || null}
                 onSuccess={() => {
-                    fetchDbPlaces(); // Refresh DB data
+                    if (mapInstance) {
+                        const bounds = mapInstance.getBounds();
+                        fetchDbPlaces({
+                            bounds: {
+                                minLat: bounds.getSouthWest().lat,
+                                maxLat: bounds.getNorthEast().lat,
+                                minLng: bounds.getSouthWest().lng,
+                                maxLng: bounds.getNorthEast().lng
+                            }
+                        });
+                    } else {
+                        fetchDbPlaces(); // Refresh DB data
+                    }
                     showToast(t.changesSubmittedForAdmin);
                 }}
                 t={t}

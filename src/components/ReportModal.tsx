@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { databases, ID } from '../lib/appwrite';
 import { X, Flag, Loader2 } from 'lucide-react';
 import { Place } from '../lib/types';
+import { createUpdate } from '../lib/oracle';
 
 interface ReportModalProps {
     isOpen: boolean;
@@ -38,9 +38,9 @@ export default function ReportModal({ isOpen, onClose, place, t, onSuccess }: Re
         setError(null);
 
         try {
-            await databases.createDocument('kafmap', 'pending_updates', ID.unique(), {
-                placeId: place.id.toString(),
-                placeName: place.name,
+            await createUpdate({
+                placeid: place.id.toString(),
+                placename: place.name,
                 type: 'report',
                 payload: JSON.stringify({
                     reasonCode: reason,

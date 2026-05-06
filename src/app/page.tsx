@@ -168,8 +168,8 @@ export default function Home() {
                 Query.equal('placeId', selectedId.toString())
             ]).then(res => {
                 const docs = res.documents;
-                setPlaceReports(docs.filter(d => d.type === 'report'));
-                setPlaceUpdates(docs.filter(d => d.type === 'update'));
+                setPlaceReports(docs.filter((d: any) => d.type === 'report'));
+                setPlaceUpdates(docs.filter((d: any) => d.type === 'update'));
             }).catch(err => {
                 console.error("Failed to fetch pending updates/reports", err);
             });
@@ -1448,7 +1448,7 @@ export default function Home() {
                         databases.listDocuments('kafmap', 'pending_updates', [
                             Query.equal('placeId', selectedId.toString()),
                             Query.equal('type', 'report')
-                        ]).then(res => setPlaceReports(res.documents));
+                        ]).then((res: any) => setPlaceReports(res.documents));
                     }
                 }}
             />

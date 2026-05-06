@@ -1268,8 +1268,8 @@ export default function Home() {
                                                 {t.openUrlMenu}
                                             </a>
                                         ) : (
-                                            <div className={`bg-white dark:bg-gray-800 border rounded-xl shadow-sm ${selectedPlace.menu.length > 0 ? 'border-gray-100 dark:border-gray-700 p-4' : 'border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 p-6 flex flex-col items-center justify-center text-center'}`}>
-                                                {selectedPlace.menu.length > 0 ? (
+                                            <div className={`bg-white dark:bg-gray-800 border rounded-xl shadow-sm ${selectedPlace.menu?.length > 0 ? 'border-gray-100 dark:border-gray-700 p-4' : 'border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/50 p-6 flex flex-col items-center justify-center text-center'}`}>
+                                                {selectedPlace.menu?.length > 0 ? (
                                                     <div className="space-y-0">
                                                         {selectedPlace.menu.slice(0, 3).map((item, idx) => (
                                                             <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-700 last:border-0">
@@ -1290,7 +1290,7 @@ export default function Home() {
                                                 )}
                                             </div>
                                         )}
-                                        {selectedPlace.isRegistered && (selectedPlace.menu.length > 0 || selectedPlace.menuUrl) && renderVerificationFooter('menu', selectedPlace.menuUpdatedAt, selectedPlace.menuUpvotes, pendingMenuUpdates, hasReport('menuPricesOutdated') ? t.menuPricesOutdated : null)}
+                                        {selectedPlace.isRegistered && ((selectedPlace.menu?.length > 0) || selectedPlace.menuUrl) && renderVerificationFooter('menu', selectedPlace.menuUpdatedAt, selectedPlace.menuUpvotes, pendingMenuUpdates, hasReport('menuPricesOutdated') ? t.menuPricesOutdated : null)}
                                     </div>
 
                                     {/* Action Button Removed -> Use Pencils Instead */}
@@ -1367,7 +1367,7 @@ export default function Home() {
                                                             })()}
 
                                                             {/* Menu Status */}
-                                                            {place.menu.length > 0 ? (
+                                                            {place.menu?.length > 0 ? (
                                                                 <span className="text-xs font-medium text-green-600 dark:text-green-500 flex items-center gap-1"><Utensils size={12} /> {t.menu}</span>
                                                             ) : (
                                                                 <span className="text-xs font-medium text-gray-400 dark:text-gray-500 flex items-center gap-1"><Utensils size={12} /> {t.menu}</span>

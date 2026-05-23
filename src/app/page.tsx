@@ -1447,7 +1447,8 @@ export default function Home() {
                             </button>
 
                             <div className="max-h-40 overflow-y-auto custom-scrollbar">
-                                {Array.from(new Set(favorites.map(f => f.listType))).map(listName => {
+                                {Array.from(new Set(favorites.map(f => f.listType).filter(Boolean))).map(listName => {
+                                    if (!listName) return null;
                                     const listItems = favorites.filter(f => f.listType === listName);
                                     const count = listItems.length;
                                     const listColor = listItems[0]?.listColor || '#ec4899';
@@ -1846,10 +1847,11 @@ export default function Home() {
                                                         
                                                         <div className="max-h-48 overflow-y-auto space-y-1 mb-3 custom-scrollbar">
                                                             {/* Default & Custom Lists */}
-                                                            {Array.from(new Set(['Favorites', 'Want to go', ...favorites.map(f => f.listType)])).map(listName => {
-                                                                const listEntry = favorites.find(f => f.listType.toLowerCase() === listName.toLowerCase());
+                                                            {Array.from(new Set(['Favorites', 'Want to go', ...favorites.map(f => f.listType).filter(Boolean)])).map(listName => {
+                                                                if (!listName) return null;
+                                                                const listEntry = favorites.find(f => f.listType?.toLowerCase() === listName.toLowerCase());
                                                                 const listColor = listEntry?.listColor || (listName === 'Favorites' ? '#ec4899' : '#3b82f6');
-                                                                const isInList = favorites.some(f => f.placeId === selectedPlace.id.toString() && f.listType.toLowerCase() === listName.toLowerCase());
+                                                                const isInList = favorites.some(f => f.placeId === selectedPlace.id.toString() && f.listType?.toLowerCase() === listName.toLowerCase());
                                                                 
                                                                 return (
                                                                     <button

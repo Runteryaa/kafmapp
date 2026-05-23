@@ -75,6 +75,24 @@ export default function AdminPage() {
         }
     };
 
+    const fetchPendingUpdates = async () => {
+        try {
+            const response = await databases.listDocuments('kafmap', 'pending_updates');
+            setPendingUpdates(response.documents);
+        } catch (error) {
+            console.error("Failed to fetch pending updates:", error);
+        }
+    };
+
+    const fetchReviews = async () => {
+        try {
+            const response = await databases.listDocuments('kafmap', 'reviews');
+            setAllReviews(response.documents);
+        } catch (error) {
+            console.error("Failed to fetch reviews:", error);
+        }
+    };
+
     const fetchUsers = async () => {
         try {
             const response = await databases.listDocuments('kafmap', 'users');

@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: #f9fafb;
+    --foreground: #1f2937;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out forwards;
+  }
+
+  .animate-premium-glow {
+    animation: premiumGlow 2s infinite;
+  }
+
+  /* Brightness filter for dark mode map tiles */
+  .map-tiles-dark {
+    filter: brightness(2) contrast(0.7);
+  }
+}
+
+@keyframes premiumGlow {
+  0% {
+    box-shadow: 0 0 0 0 var(--glow-color);
+  }
+  70% {
+    box-shadow: 0 0 0 15px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+/* Custom map control styles and marker adjustments */
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+.leaflet-control-zoom a {
+  color: #4b5563 !important;
+}
+
+/* Custom DivIcon styling */
+.custom-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+  color: white;
+  font-size: 14px;
+  transition: transform 0.2s;
+}
+.custom-marker:hover {
+  transform: scale(1.1);
+}
+.marker-cafe {
+  background-color: #d97706;
+} /* Amber-600 */
+.marker-restaurant {
+  background-color: #ea580c;
+} /* Orange-600 */
+
+/* Custom Tooltip Styling for Pins */
+.leaflet-tooltip.custom-tooltip {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  color: #111827;
+  border-radius: 8px;
+  padding: 6px 10px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  font-family: inherit;
+  pointer-events: none;
+}
+
+/* Tooltip arrow coloring to match bubble */
+.leaflet-tooltip-top.custom-tooltip::before {
+  border-top-color: white;
+}

@@ -583,6 +583,7 @@ export default function AdminPage() {
                                                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Venue</th>
                                                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden md:table-cell">Type</th>
                                                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest hidden lg:table-cell">Rating</th>
+                                                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Premium</th>
                                                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
                                                 <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
                                             </tr>
@@ -609,6 +610,17 @@ export default function AdminPage() {
                                                             <Star size={14} className="text-amber-400 fill-amber-400" />
                                                             <span className="text-sm font-black text-gray-900 dark:text-white">{venue.rating?.toFixed(1) || '0.0'}</span>
                                                         </div>
+                                                    </td>
+                                                    <td className="px-6 py-5">
+                                                        {venue.isPremium ? (
+                                                            <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 flex items-center gap-1 w-fit">
+                                                                <Star size={10} fill="currentColor" /> Premium
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 w-fit">
+                                                                Standard
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-5">
                                                         <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg ${venue.isRegistered ? 'bg-green-50 text-green-600 dark:bg-green-900/20' : 'bg-gray-100 text-gray-500 dark:bg-gray-700'}`}>

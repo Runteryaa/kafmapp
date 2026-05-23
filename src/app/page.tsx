@@ -303,6 +303,7 @@ export default function Home() {
     useEffect(() => {
         if (newPlaceCoords && isAddModalOpen) {
             setIsAddPlaceLoading(true);
+            setNewPlaceData(prev => ({ ...prev, address: "" })); // Clear old address
             fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${newPlaceCoords.lat}&lon=${newPlaceCoords.lng}&zoom=18&addressdetails=1`)
                 .then(res => res.json())
                 .then(data => {
@@ -319,10 +320,15 @@ export default function Home() {
                         
                         if (formattedAddress.length > 0) {
                             setNewPlaceData(prev => ({ ...prev, address: formattedAddress.join(', ') }));
+                        } else {
+                            showToast("Adres otomatik bulunamadı, lütfen manuel yazın.");
                         }
                     }
                 })
-                .catch(err => console.error("Reverse geocoding failed", err))
+                .catch(err => {
+                    console.error("Reverse geocoding failed", err);
+                    showToast("Adres servis hatası, lütfen manuel girin.");
+                })
                 .finally(() => {
                     setIsAddPlaceLoading(false);
                 });
@@ -1121,6 +1127,10 @@ export default function Home() {
             return;
         }
         if (!newPlaceCoords) return;
+        if (!newPlaceData.address || newPlaceData.address.trim() === "") {
+            showToast("Mekan adresi boş olamaz!");
+            return;
+        }
 
         setIsAddPlaceLoading(true);
         try {
@@ -2869,6 +2879,7 @@ export default function Home() {
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2 px-1">Address</label>
                                     <textarea 
+                                        required
                                         value={newPlaceData.address}
                                         onChange={(e) => setNewPlaceData({...newPlaceData, address: e.target.value})}
                                         placeholder="Full address of the place..."

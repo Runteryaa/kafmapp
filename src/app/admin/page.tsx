@@ -217,6 +217,12 @@ export default function AdminPage() {
 
     const handleSaveVenue = async () => {
         if (!editingVenue) return;
+        
+        if (!editingVenue.address || editingVenue.address.trim() === "") {
+            alert("Mekan adresi boş olamaz!");
+            return;
+        }
+
         setIsSavingVenue(true);
         try {
             // Check if it's a new venue (no $id) or an existing one

@@ -776,6 +776,7 @@ export default function Home() {
                     placeId: selectedPlace.id.toString(),
                     userId: user.$id,
                     userName: user.name || "User",
+                    userRole: (user as any).role || "user",
                     rating: reviewRating.toString(),
                     commentText: reviewText,
                     createdAt: new Date().toISOString()
@@ -2233,12 +2234,18 @@ export default function Home() {
                                                                     {review.userName ? review.userName.substring(0, 2) : 'U'}
                                                                 </div>
                                                                 <div>
-                                                                    <p className="text-sm font-bold text-gray-900 dark:text-white">{review.userName || 'User'}</p>
-                                                                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                                                                        {new Date(review.createdAt).toLocaleDateString()}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
+                                                                   <div className="flex items-center gap-2">
+                                                                       <p className="text-sm font-bold text-gray-900 dark:text-white">{review.userName || 'User'}</p>
+                                                                       {((review as any).userRole === 'admin' || (review as any).userRole === 'moderator') && (
+                                                                           <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${(review as any).userRole === 'admin' ? 'bg-red-500 text-white shadow-sm shadow-red-500/20' : 'bg-blue-500 text-white shadow-sm shadow-blue-500/20'}`}>
+                                                                               {(review as any).userRole}
+                                                                           </span>
+                                                                       )}
+                                                                   </div>
+                                                                   <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                                                                       {new Date(review.createdAt).toLocaleDateString()}
+                                                                   </p>
+                                                                </div>                                                            </div>
                                                             <div className="flex items-center gap-1">
                                                                 <Star size={12} className="text-yellow-400 fill-yellow-400" />
                                                                 <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{review.rating}</span>

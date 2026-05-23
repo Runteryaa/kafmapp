@@ -92,6 +92,7 @@ const account = {
             email: email,
             password: hashedPassword,
             name: name || '',
+            role: 'user',
             createdat: new Date().toISOString()
         };
         
@@ -150,7 +151,9 @@ const normalizeDoc = (doc: any) => {
         premiumcolor: 'premiumColor',
         listtype: 'listType',
         listcolor: 'listColor',
-        isspam: 'isSpam'
+        isspam: 'isSpam',
+        role: 'role',
+        userrole: 'userRole'
     };
 
     // Copy everything using lowercase mapping check, starting from EMPTY object to avoid duplicates
@@ -216,7 +219,9 @@ const denormalizeDoc = (doc: any) => {
         premiumColor: 'premiumcolor',
         listType: 'listtype',
         listColor: 'listcolor',
-        isSpam: 'isspam'
+        isSpam: 'isspam',
+        role: 'role',
+        userRole: 'userrole'
     };
     
     // Process input starting from EMPTY object to avoid casing duplicates

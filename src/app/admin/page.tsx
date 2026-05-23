@@ -8,8 +8,9 @@ import {
     Pizza, Beer, Star, ExternalLink, AlertCircle, RefreshCw, LayoutDashboard, Store, MessageSquare
 } from 'lucide-react';
 import { Place, MenuItem } from '../../lib/types';
+import { User } from 'lucide-react';
 
-type Tab = 'submissions' | 'venues' | 'reviews';
+type Tab = 'submissions' | 'venues' | 'reviews' | 'users';
 
 export default function AdminPage() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -22,8 +23,10 @@ export default function AdminPage() {
     const [pendingUpdates, setPendingUpdates] = useState<any[]>([]);
     const [allVenues, setAllVenues] = useState<Place[]>([]);
     const [allReviews, setAllReviews] = useState<any[]>([]);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
     const [venueSearchQuery, setVenueSearchQuery] = useState("");
     const [reviewSearchQuery, setReviewSearchQuery] = useState("");
+    const [userSearchQuery, setUserSearchQuery] = useState("");
     
     // Action states
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -62,7 +65,8 @@ export default function AdminPage() {
             await Promise.all([
                 fetchPendingUpdates(),
                 fetchVenues(),
-                fetchReviews()
+                fetchReviews(),
+                fetchUsers()
             ]);
         } catch (error) {
             console.error("Fetch all failed", error);
@@ -71,23 +75,35 @@ export default function AdminPage() {
         }
     };
 
-    const fetchPendingUpdates = async () => {
+    const fetchUsers = async () => {
         try {
-            const response = await databases.listDocuments('kafmap', 'pending_updates');
-            setPendingUpdates(response.documents);
+            const response = await databases.listDocuments('kafmap', 'users');
+            setAllUsers(response.documents);
         } catch (error) {
-            console.error("Failed to fetch pending updates:", error);
+            console.error("Failed to fetch users:", error);
         }
     };
 
-    const fetchReviews = async () => {
+    const handleUpdateUserRole = async (userId: string, newRole: string) => {
+        setActionLoadingId(userId);
         try {
-            const response = await databases.listDocuments('kafmap', 'reviews');
-            setAllReviews(response.documents);
+            await databases.updateDocument('kafmap', 'users', userId, { role: newRole });
+            setAllUsers(prev => prev.map(u => u.$id === userId ? { ...u, role: newRole } : u));
         } catch (error) {
-            console.error("Failed to fetch reviews:", error);
+            console.error("Failed to update user role:", error);
+            alert("Failed to update user role.");
+        } finally {
+            setActionLoadingId(null);
         }
     };
+
+    const filteredUsers = useMemo(() => {
+        return allUsers.filter(u => 
+            (u.name || "").toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+            (u.email || "").toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+            u.$id.includes(userSearchQuery)
+        );
+    }, [allUsers, userSearchQuery]);
 
     const fetchVenues = async () => {
         try {
@@ -396,6 +412,12 @@ export default function AdminPage() {
                     >
                         <MessageSquare size={20} /> Reviews
                     </button>
+                    <button 
+                        onClick={() => setActiveTab('users')}
+                        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'users' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                    >
+                        <User size={20} /> Manage Users
+                    </button>
                 </nav>
 
                 <div className="mt-auto pt-6 border-t border-gray-100 dark:border-gray-800 px-2">
@@ -697,7 +719,14 @@ export default function AdminPage() {
                                                     {review.userName ? review.userName.substring(0, 2) : 'U'}
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-black text-gray-900 dark:text-white">{review.userName || 'User'}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-black text-gray-900 dark:text-white">{review.userName || 'User'}</p>
+                                                        {(review.userRole === 'admin' || review.userRole === 'moderator') && (
+                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${review.userRole === 'admin' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30'}`}>
+                                                                {review.userRole}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Place ID: {review.placeId}</p>
                                                 </div>
                                             </div>
@@ -733,6 +762,82 @@ export default function AdminPage() {
                                     <p className="text-gray-400 font-bold">No reviews found.</p>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {!isLoading && activeTab === 'users' && (
+                        <div className="space-y-6">
+                            {/* Toolbar */}
+                            <div className="bg-white dark:bg-gray-800 p-4 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/10 dark:shadow-none flex flex-col md:flex-row gap-4">
+                                <div className="relative flex-1 group">
+                                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-amber-500 transition-colors" />
+                                    <input 
+                                        type="text" 
+                                        value={userSearchQuery}
+                                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                                        placeholder="Search by name, email or ID..."
+                                        className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-gray-900/50 border border-transparent focus:border-amber-500/30 rounded-2xl outline-none text-sm font-bold text-gray-900 dark:text-white transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Users Table */}
+                            <div className="bg-white dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-xl shadow-gray-200/10 overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse">
+                                        <thead>
+                                            <tr className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-800 text-left">
+                                                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">User</th>
+                                                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</th>
+                                                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Role</th>
+                                                <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                                            {filteredUsers.map((u: any) => (
+                                                <tr key={u.$id} className="hover:bg-amber-50/10 dark:hover:bg-amber-900/5 transition-colors group">
+                                                    <td className="px-6 py-5">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center font-black text-xs uppercase text-gray-500">
+                                                                {u.name ? u.name.substring(0, 2) : 'U'}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-sm font-black text-gray-900 dark:text-white leading-tight">{u.name || 'Anonymous'}</p>
+                                                                <p className="text-[10px] text-gray-400 font-mono font-bold">ID: {u.$id}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-5">
+                                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{u.email}</p>
+                                                    </td>
+                                                    <td className="px-6 py-5">
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg ${u.role === 'admin' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : u.role === 'moderator' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                                                            {u.role || 'user'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-5 text-right">
+                                                        <select 
+                                                            value={u.role || 'user'}
+                                                            onChange={(e) => handleUpdateUserRole(u.$id, e.target.value)}
+                                                            disabled={actionLoadingId === u.$id}
+                                                            className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-bold py-1.5 px-2 outline-none focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer disabled:opacity-50"
+                                                        >
+                                                            <option value="user">Set as User</option>
+                                                            <option value="moderator">Set as Moderator</option>
+                                                            <option value="admin">Set as Admin</option>
+                                                        </select>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {filteredUsers.length === 0 && (
+                                    <div className="py-20 text-center">
+                                        <p className="text-gray-400 font-bold">No users found.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

@@ -3,10 +3,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { databases, ID } from '../../lib/appwrite';
 import { getTranslation } from '../../lib/translations';
+import { useAuth } from '../../context/AuthContext';
 import { 
     Check, X, ShieldCheck, Lock, Loader2, MapPin, KeyRound, Wifi, 
     Link, Pencil, Trash2, Search, Plus, Coffee, Utensils, 
-    Pizza, Beer, Star, ExternalLink, AlertCircle, RefreshCw, LayoutDashboard, Store, MessageSquare
+    Pizza, Beer, Star, ExternalLink, AlertCircle, RefreshCw, LayoutDashboard, Store, MessageSquare,
+    Ban, Trash
 } from 'lucide-react';
 import { Place, MenuItem } from '../../lib/types';
 import { User } from 'lucide-react';
@@ -14,6 +16,7 @@ import { User } from 'lucide-react';
 type Tab = 'submissions' | 'venues' | 'reviews' | 'users';
 
 export default function AdminPage() {
+    const { user } = useAuth();
     const [language, setLanguage] = useState<'tr' | 'en'>('tr');
     const t = getTranslation(language);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -21,6 +24,7 @@ export default function AdminPage() {
     const [activeTab, setActiveTab] = useState<Tab>('submissions');
     const [submissionSubTab, setSubmissionSubTab] = useState<'all' | 'reports' | 'additions' | 'updates' | 'spam'>('all');
     const [isLoading, setIsLoading] = useState(false);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
     
     // Data states
     const [pendingUpdates, setPendingUpdates] = useState<any[]>([]);
@@ -113,6 +117,41 @@ export default function AdminPage() {
         } catch (error) {
             console.error("Failed to update user role:", error);
             alert("Failed to update user role.");
+        } finally {
+            setActionLoadingId(null);
+        }
+    };
+
+    const handleToggleBan = async (user: any) => {
+        const isCurrentlyBanned = user.isBanned === 'true';
+        const newStatus = isCurrentlyBanned ? 'false' : 'true';
+        
+        if (!confirm(`${user.name || 'User'} isimli kullanıcıyı ${isCurrentlyBanned ? 'banını kaldırmak' : 'banlamak'} istediğinize emin misiniz?`)) return;
+
+        setActionLoadingId(user.$id);
+        try {
+            await databases.updateDocument('kafmap', 'users', user.$id, { isBanned: newStatus });
+            setAllUsers(prev => prev.map(u => u.$id === user.$id ? { ...u, isBanned: newStatus } : u));
+            showToast(`User ${isCurrentlyBanned ? 'unbanned' : 'banned'} successfully`);
+        } catch (error) {
+            console.error("Failed to toggle ban:", error);
+            alert("İşlem başarısız.");
+        } finally {
+            setActionLoadingId(null);
+        }
+    };
+
+    const handleDeleteUser = async (user: any) => {
+        if (!confirm(`${user.name || 'User'} kullanıcısının hesabını tamamen silmek istediğinize emin misiniz? BU İŞLEM GERİ ALINAMAZ.`)) return;
+
+        setActionLoadingId(user.$id);
+        try {
+            await databases.deleteDocument('kafmap', 'users', user.$id);
+            setAllUsers(prev => prev.filter(u => u.$id !== user.$id));
+            showToast("Account deleted successfully");
+        } catch (error) {
+            console.error("Failed to delete user:", error);
+            alert("Silme işlemi başarısız.");
         } finally {
             setActionLoadingId(null);
         }
@@ -442,9 +481,15 @@ export default function AdminPage() {
                 </nav>
 
                 <div className="mt-auto pt-6 border-t border-gray-100 dark:border-gray-800 px-2">
+                    {user && (
+                        <div className="mb-4 px-2">
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Logged in as</p>
+                            <p className="text-xs font-black text-gray-600 dark:text-gray-300 truncate" title={user.email}>{user.email}</p>
+                        </div>
+                    )}
                     <button 
                         onClick={() => setIsAuthenticated(false)}
-                        className="flex items-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 transition-colors"
+                        className="flex items-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 transition-colors w-full px-2 py-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10"
                     >
                         <X size={18} /> Logout
                     </button>
@@ -832,21 +877,46 @@ export default function AdminPage() {
                                                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{u.email}</p>
                                                     </td>
                                                     <td className="px-6 py-5">
-                                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg ${u.role === 'admin' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : u.role === 'explorer' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
-                                                            {u.role === 'admin' ? 'admin' : u.role === 'explorer' ? 'explorer' : (u.role || 'user')}
-                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg ${u.role === 'admin' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : u.role === 'explorer' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                                                                {u.role === 'admin' ? 'admin' : u.role === 'explorer' ? 'explorer' : (u.role || 'user')}
+                                                            </span>
+                                                            {u.isBanned === 'true' && (
+                                                                <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg bg-black text-white flex items-center gap-1">
+                                                                    <Ban size={10} /> Banned
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-5 text-right">
-                                                        <select 
-                                                            value={u.role || 'user'}
-                                                            onChange={(e) => handleUpdateUserRole(u.$id, e.target.value)}
-                                                            disabled={actionLoadingId === u.$id}
-                                                            className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-bold py-1.5 px-2 outline-none focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer disabled:opacity-50"
-                                                        >
-                                                            <option value="user">Set as User</option>
-                                                            <option value="explorer">Set as Explorer</option>
-                                                            <option value="admin">Set as Admin</option>
-                                                        </select>
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <select 
+                                                                value={u.role || 'user'}
+                                                                onChange={(e) => handleUpdateUserRole(u.$id, e.target.value)}
+                                                                disabled={actionLoadingId === u.$id}
+                                                                className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-bold py-1.5 px-2 outline-none focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer disabled:opacity-50"
+                                                            >
+                                                                <option value="user">Set as User</option>
+                                                                <option value="explorer">Set as Explorer</option>
+                                                                <option value="admin">Set as Admin</option>
+                                                            </select>
+                                                            <button 
+                                                                onClick={() => handleToggleBan(u)}
+                                                                disabled={actionLoadingId === u.$id}
+                                                                className={`p-2 rounded-xl transition-all ${u.isBanned === 'true' ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}
+                                                                title={u.isBanned === 'true' ? 'Unban User' : 'Ban User'}
+                                                            >
+                                                                {actionLoadingId === u.$id ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => handleDeleteUser(u)}
+                                                                disabled={actionLoadingId === u.$id}
+                                                                className="p-2 bg-gray-50 text-gray-400 hover:bg-red-500 hover:text-white rounded-xl transition-all"
+                                                                title="Delete User"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1046,6 +1116,12 @@ export default function AdminPage() {
                     </div>
                 </div>
             )}
+
+            {/* Toast Notification */}
+            <div className={`fixed bottom-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-2xl shadow-2xl z-[9000] flex items-center gap-3 transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+                <ShieldCheck size={18} className="text-amber-400" />
+                <span className="text-sm font-black tracking-wide">{toastMessage}</span>
+            </div>
         </div>
     );
 }

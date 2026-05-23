@@ -44,14 +44,44 @@ const deleteCookie = (name: string) => {
 const account = {
     get: async () => {
         const userData = getCookie('kafmap_auth');
-        if (userData) {
-            try {
-                return JSON.parse(decodeURIComponent(userData));
-            } catch(e) {
-                return null;
+        if (!userData) throw new Error('Not authenticated');
+
+        try {
+            const localUser = JSON.parse(decodeURIComponent(userData));
+            const userId = localUser.$id || localUser.id || localUser.ID;
+
+            if (!userId) {
+                deleteCookie('kafmap_auth');
+                throw new Error('Invalid session data');
             }
+
+            // Verify with backend that the user still exists and isn't banned
+            const url = `${BASE_URL}/user_accounts/${userId}`;
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                // If user is deleted or record is gone, clear session
+                deleteCookie('kafmap_auth');
+                throw new Error('Session expired or account deleted');
+            }
+
+            const rawData = await response.json();
+            const latestUser = normalizeDoc(Array.isArray(rawData.items) ? rawData.items[0] : rawData);
+            
+            // Re-normalize $id to ensure consistency
+            if (!latestUser.$id) latestUser.$id = latestUser.id || latestUser.ID || userId;
+
+            // Optional: If banned, we could also force logout here or just let the UI handle it
+            // if (latestUser.isBanned === 'true') { ... }
+
+            // Update cookie with latest data (roles, name changes, etc)
+            setCookie('kafmap_auth', encodeURIComponent(JSON.stringify(latestUser)), 30);
+            
+            return latestUser;
+        } catch(e) {
+            deleteCookie('kafmap_auth');
+            throw new Error('Not authenticated');
         }
-        throw new Error('Not authenticated');
     },
     createEmailPasswordSession: async (email: string, password: string) => {
         const hashedPassword = await hashPassword(password);
@@ -154,7 +184,8 @@ const normalizeDoc = (doc: any) => {
         listcolor: 'listColor',
         isspam: 'isSpam',
         role: 'role',
-        userrole: 'userRole'
+        userrole: 'userRole',
+        isbanned: 'isBanned'
     };
 
     // Copy everything using lowercase mapping check, starting from EMPTY object to avoid duplicates
@@ -222,7 +253,8 @@ const denormalizeDoc = (doc: any) => {
         listColor: 'listcolor',
         isSpam: 'isspam',
         role: 'role',
-        userRole: 'userrole'
+        userRole: 'userrole',
+        isBanned: 'isbanned'
     };
     
     // Process input starting from EMPTY object to avoid casing duplicates
@@ -275,7 +307,13 @@ const databases = {
         }
         
         return { 
-            documents: items.map(normalizeDoc), 
+            documents: items.map((item: any) => {
+                const normalized = normalizeDoc(item);
+                if (!normalized.$id) {
+                    normalized.$id = normalized.id || normalized.ID || normalized.placeId || normalized.placeid;
+                }
+                return normalized;
+            }), 
             total: items.length 
         };
     },

@@ -54,10 +54,19 @@ export default function RootLayout({
               if (typeof navigator.serviceWorker !== 'undefined') {
                 navigator.serviceWorker.register('/sw.js')
               }
+              
               window.addEventListener('beforeinstallprompt', function(e) {
                 e.preventDefault();
                 window.deferredPrompt = e;
               });
+
+              // Catch ChunkLoadError and force reload to get latest assets
+              window.addEventListener('error', function(e) {
+                if (e.message && (e.message.includes('ChunkLoadError') || e.message.includes('Loading chunk'))) {
+                  console.warn('New version detected, reloading...');
+                  window.location.reload();
+                }
+              }, true);
             `,
           }}
         />

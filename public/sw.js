@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kafmap-v2';
+const CACHE_NAME = 'kafmap-v3';
 const urlsToCache = [
   '/',
   '/manifest.json',
@@ -32,47 +32,53 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Bypass cache for API requests and non-GET requests
-  if (event.request.method !== 'GET' || event.request.url.includes('kafmapdb.runte.workers.dev') || event.request.url.includes('appwrite.io')) {
+  const url = event.request.url;
+
+  // Bypass cache for API requests, Auth, and non-GET requests
+  if (
+    event.request.method !== 'GET' || 
+    url.includes('kafmapdb.runte.workers.dev') || 
+    url.includes('appwrite.io') ||
+    url.includes('overpass-api.de') ||
+    url.includes('geojs.io')
+  ) {
     return;
   }
 
-  // Handle HTML navigation requests
+  // Handle HTML navigation requests (NETWORK FIRST)
   if (event.request.mode === 'navigate' || (event.request.method === 'GET' && event.request.headers.get('accept').includes('text/html'))) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Cache latest version
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          // If response is valid, update cache
+          if (response && response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+          }
           return response;
         })
         .catch(() => {
-          // If offline, serve offline.html
-          return caches.match('/offline.html');
+          // If offline, serve cached HTML or offline.html
+          return caches.match(event.request).then(cached => cached || caches.match('/offline.html'));
         })
     );
     return;
   }
 
-  // Handle other resources (Cache First, falling back to Network)
+  // Handle other resources (JS, CSS, Images) - STALE WHILE REVALIDATE
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      if (response) {
-        return response;
-      }
-      return fetch(event.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+    caches.match(event.request).then((cachedResponse) => {
+      const fetchPromise = fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
         }
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
         return networkResponse;
       }).catch(() => {
-        // Ignore failures for images/css/js
+        // Silently fail network if offline
       });
+
+      return cachedResponse || fetchPromise;
     })
   );
 });

@@ -518,7 +518,8 @@ export default function MapComponent({
                         <MarkerClusterGroup
                             chunkedLoading
                             maxClusterRadius={120}
-                            spiderfyOnMaxZoom={true}
+                            spiderfyOnMaxZoom={false}
+                            zoomToBoundsOnClick={true}
                             disableClusteringAtZoom={17}
                             removeOutsideVisibleBounds={true}
                         >

@@ -109,6 +109,11 @@ export default function AdminPage() {
         }
     };
 
+    const showToast = (message: string) => {
+        setToastMessage(message);
+        setTimeout(() => setToastMessage(null), 2500);
+    };
+
     const handleUpdateUserRole = async (userId: string, newRole: string) => {
         setActionLoadingId(userId);
         try {

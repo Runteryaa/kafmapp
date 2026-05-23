@@ -148,7 +148,8 @@ const normalizeDoc = (doc: any) => {
         ispremium: 'isPremium',
         premiumuntil: 'premiumUntil',
         premiumcolor: 'premiumColor',
-        listtype: 'listType'
+        listtype: 'listType',
+        listcolor: 'listColor'
     };
 
     // Copy everything using lowercase mapping check, starting from EMPTY object to avoid duplicates
@@ -212,7 +213,8 @@ const denormalizeDoc = (doc: any) => {
         isPremium: 'ispremium',
         premiumUntil: 'premiumuntil',
         premiumColor: 'premiumcolor',
-        listType: 'listtype'
+        listType: 'listtype',
+        listColor: 'listcolor'
     };
     
     // Process input starting from EMPTY object to avoid casing duplicates

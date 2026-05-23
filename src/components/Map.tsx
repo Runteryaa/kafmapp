@@ -27,8 +27,8 @@ function MapEventsWrapper({ onZoomEnd, onMoveEnd, setMapRef, onMapClick }: any) 
 // Icon cache outside component to prevent recreating L.divIcon
 const iconCache: Record<string, any> = {};
 
-const getCustomIcon = (type: string, isUnclaimed: boolean, isPremium: boolean, premiumColor?: string, isFavorite?: boolean) => {
-    const cacheKey = `${type}-${isUnclaimed}-${isPremium}-${premiumColor || 'default'}-${isFavorite}`;
+const getCustomIcon = (type: string, isUnclaimed: boolean, isPremium: boolean, premiumColor?: string, favoriteColor?: string) => {
+    const cacheKey = `${type}-${isUnclaimed}-${isPremium}-${premiumColor || 'default'}-${favoriteColor || 'none'}`;
     if (iconCache[cacheKey]) {
         return iconCache[cacheKey];
     }
@@ -57,10 +57,10 @@ const getCustomIcon = (type: string, isUnclaimed: boolean, isPremium: boolean, p
         }
     }
 
-    // Use custom premium color for border/glow, but keep bgColor for background
-    // If favorite, override with pink color if not premium
-    const finalPremiumColor = isPremium ? (premiumColor || '#ffd700') : (isFavorite ? '#ec4899' : '#ffd700');
-    const hasGlow = isPremium || isFavorite;
+    // Use custom premium color or favorite color for border
+    // If favorite, override with specific list color if not premium
+    const finalOutlineColor = isPremium ? (premiumColor || '#ffd700') : (favoriteColor || '#ec4899');
+    const isHighlighted = isPremium || !!favoriteColor;
 
     const cafeIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-coffee"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/><path d="M6 2v2"/></svg>`;
     const restaurantIconHtml = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-utensils"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>`;
@@ -84,16 +84,16 @@ const getCustomIcon = (type: string, isUnclaimed: boolean, isPremium: boolean, p
             break;
     }
 
-    const iconClasses = `flex items-center justify-center w-8 h-8 rounded-full border-2 shadow-lg text-white transition-transform duration-200 ${hasGlow ? 'animate-premium-glow' : ''}`;
+    const iconClasses = `flex items-center justify-center w-8 h-8 rounded-full border-2 shadow-lg text-white transition-transform duration-200 ${isPremium ? 'animate-premium-glow' : ''}`;
     
     // Dynamic CSS variables for the glow animation
     // Category color stays as background, premiumColor only for border and glow wave
     const inlineStyle = `
         background-color: ${bgColor}; 
         opacity: ${isUnclaimed ? 0.8 : 1}; 
-        ${hasGlow ? `
-            --glow-color: ${finalPremiumColor}; 
-            border-color: ${finalPremiumColor};
+        ${isHighlighted ? `
+            --glow-color: ${finalOutlineColor}; 
+            border-color: ${finalOutlineColor};
             border-width: 3px;
         ` : 'border-color: white;'}
     `;
@@ -116,7 +116,7 @@ const userIcon = L.divIcon({
     iconAnchor: [10, 10]
 });
 
-const PlaceMarker = memo(({ place, onSelect, isFavorite }: { place: Place, onSelect: (id: number) => void, isFavorite?: boolean }) => {
+const PlaceMarker = memo(({ place, onSelect, isFavorite, listColor }: { place: Place, onSelect: (id: number) => void, isFavorite?: boolean, listColor?: string }) => {
     const isUnclaimed = !place.isRegistered;
     const eventHandlers = useMemo(() => ({ click: () => onSelect(place.id) }), [place.id, onSelect]);
     
@@ -130,12 +130,12 @@ const PlaceMarker = memo(({ place, onSelect, isFavorite }: { place: Place, onSel
     return (
         <Marker
             position={[place.lat, place.lng]}
-            icon={getCustomIcon(place.type, isUnclaimed, isPremiumActive, place.premiumColor, isFavorite)}
+            icon={getCustomIcon(place.type, isUnclaimed, isPremiumActive, place.premiumColor, listColor)}
             eventHandlers={eventHandlers}
             zIndexOffset={isPremiumActive || isFavorite ? 1000 : 0}
         >
             <Tooltip direction="top" offset={[0, -16]} opacity={1} className="custom-tooltip">
-                <span className={`font-semibold border-none shadow-none text-sm ${isPremiumActive ? 'text-amber-600' : (isFavorite ? 'text-pink-600' : 'text-gray-900')}`}>{place.name}</span>
+                <span className={`font-semibold border-none shadow-none text-sm`} style={(isPremiumActive || isFavorite) ? { color: isPremiumActive ? '#d97706' : (listColor || '#ec4899') } : { color: '#111827' }}>{place.name}</span>
             </Tooltip>
         </Marker>
     );
@@ -461,14 +461,21 @@ export default function MapComponent({
                                 <PlaceMarker key={place.id} place={place} onSelect={onSelect} />
                             ))}
                         </MarkerClusterGroup>
-                        {highlightedPlaces.map((place) => (
-                            <PlaceMarker 
-                                key={place.id} 
-                                place={place} 
-                                onSelect={onSelect} 
-                                isFavorite={favoritePlaceIds.includes(place.id.toString())}
-                            />
-                        ))}
+                        {highlightedPlaces.map((place) => {
+                            const isFav = favoritePlaceIds.includes(place.id.toString());
+                            const favEntry = favorites?.find(f => f.placeId === place.id.toString());
+                            const listColor = isFav ? favEntry?.listColor : undefined;
+                            
+                            return (
+                                <PlaceMarker 
+                                    key={place.id} 
+                                    place={place} 
+                                    onSelect={onSelect} 
+                                    isFavorite={isFav}
+                                    listColor={listColor}
+                                />
+                            );
+                        })}
                     </>
                 )}
 

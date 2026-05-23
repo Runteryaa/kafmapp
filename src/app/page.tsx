@@ -70,6 +70,15 @@ const getPlaceStyle = (type: string) => {
     }
 };
 
+const LIST_COLORS = [
+    { name: 'Pink', value: '#ec4899' },
+    { name: 'Blue', value: '#3b82f6' },
+    { name: 'Green', value: '#10b981' },
+    { name: 'Purple', value: '#8b5cf6' },
+    { name: 'Orange', value: '#f59e0b' },
+    { name: 'Red', value: '#ef4444' },
+];
+
 export default function Home() {
     const [language, setLanguage] = useState<'tr' | 'en'>('tr');
     const t = getTranslation(language);
@@ -149,6 +158,7 @@ export default function Home() {
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
     const [newListName, setNewListName] = useState("");
+    const [newListColor, setNewListColor] = useState(LIST_COLORS[0].value);
 
     const fetchFavorites = useCallback(async () => {
         if (!user) {
@@ -171,7 +181,7 @@ export default function Home() {
         fetchFavorites();
     }, [fetchFavorites]);
 
-    const handleToggleFavorite = async (placeId: string, listType: string) => {
+    const handleToggleFavorite = async (placeId: string, listType: string, listColor?: string) => {
         if (!user) {
             showToast(t.loginToUpdate || "Lütfen giriş yapın");
             setIsLoginOpen(true);
@@ -186,6 +196,14 @@ export default function Home() {
                 setFavorites(prev => prev.filter(f => f.$id !== existing.$id));
                 await databases.deleteDocument('kafmap', 'favorites', existing.$id);
             } else {
+                // Determine color
+                // If creating a new entry for an existing list, try to match the color of existing items in that list
+                let finalColor = listColor;
+                if (!finalColor) {
+                    const existingListEntry = favorites.find(f => f.listType.toLowerCase() === listType.toLowerCase());
+                    finalColor = existingListEntry?.listColor || LIST_COLORS[0].value;
+                }
+
                 // Add
                 const tempId = `fav_${Date.now()}`;
                 const newFav = {
@@ -193,6 +211,7 @@ export default function Home() {
                     userId: user.$id,
                     placeId: placeId,
                     listType: listType,
+                    listColor: finalColor,
                     createdAt: new Date().toISOString()
                 };
                 setFavorites(prev => [...prev, newFav]);
@@ -204,7 +223,8 @@ export default function Home() {
                     {
                         userId: user.$id,
                         placeId: placeId,
-                        listType: listType
+                        listType: listType,
+                        listColor: finalColor
                     }
                 );
                 
@@ -1428,7 +1448,10 @@ export default function Home() {
 
                             <div className="max-h-40 overflow-y-auto custom-scrollbar">
                                 {Array.from(new Set(favorites.map(f => f.listType))).map(listName => {
-                                    const count = favorites.filter(f => f.listType === listName).length;
+                                    const listItems = favorites.filter(f => f.listType === listName);
+                                    const count = listItems.length;
+                                    const listColor = listItems[0]?.listColor || '#ec4899';
+                                    
                                     return (
                                         <button
                                             key={listName}
@@ -1437,9 +1460,13 @@ export default function Home() {
                                                 setListFilter(listName);
                                                 setIsBurgerMenuOpen(false);
                                             }}
-                                            className={`px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between text-xs font-medium transition-colors w-full text-left pl-11 ${listFilter === listName ? 'text-pink-600' : 'text-gray-500 dark:text-gray-400'}`}
+                                            className={`px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between text-xs font-medium transition-colors w-full text-left pl-11 ${listFilter === listName ? 'bg-gray-50 dark:bg-gray-700/50' : 'text-gray-500 dark:text-gray-400'}`}
+                                            style={listFilter === listName ? { color: listColor } : {}}
                                         >
-                                            <span className="truncate">{listName}</span>
+                                            <div className="flex items-center gap-2 truncate">
+                                                <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: listColor }}></div>
+                                                <span className="truncate">{listName}</span>
+                                            </div>
                                             <span className="text-[10px] opacity-50">{count}</span>
                                         </button>
                                     );
@@ -1820,14 +1847,21 @@ export default function Home() {
                                                         <div className="max-h-48 overflow-y-auto space-y-1 mb-3 custom-scrollbar">
                                                             {/* Default & Custom Lists */}
                                                             {Array.from(new Set(['Favorites', 'Want to go', ...favorites.map(f => f.listType)])).map(listName => {
+                                                                const listEntry = favorites.find(f => f.listType.toLowerCase() === listName.toLowerCase());
+                                                                const listColor = listEntry?.listColor || (listName === 'Favorites' ? '#ec4899' : '#3b82f6');
                                                                 const isInList = favorites.some(f => f.placeId === selectedPlace.id.toString() && f.listType.toLowerCase() === listName.toLowerCase());
+                                                                
                                                                 return (
                                                                     <button
                                                                         key={listName}
-                                                                        onClick={() => handleToggleFavorite(selectedPlace.id.toString(), listName)}
-                                                                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-sm font-medium transition-colors ${isInList ? 'bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                                                        onClick={() => handleToggleFavorite(selectedPlace.id.toString(), listName, listColor)}
+                                                                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-sm font-medium transition-colors ${isInList ? 'bg-gray-50 dark:bg-gray-700/50' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                                                        style={isInList ? { color: listColor, borderLeft: `4px solid ${listColor}` } : {}}
                                                                     >
-                                                                        <span className="truncate">{listName}</span>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: listColor }}></div>
+                                                                            <span className="truncate">{listName}</span>
+                                                                        </div>
                                                                         {isInList && <Check size={14} />}
                                                                     </button>
                                                                 );
@@ -1835,6 +1869,19 @@ export default function Home() {
                                                         </div>
 
                                                         <div className="pt-3 border-t border-gray-100 dark:border-gray-700">
+                                                            {/* Color Picker */}
+                                                            <div className="flex gap-1.5 mb-3 px-1">
+                                                                {LIST_COLORS.map(c => (
+                                                                    <button
+                                                                        key={c.value}
+                                                                        onClick={() => setNewListColor(c.value)}
+                                                                        className={`w-6 h-6 rounded-full border-2 transition-transform ${newListColor === c.value ? 'scale-110 border-gray-400 dark:border-white' : 'border-transparent hover:scale-105'}`}
+                                                                        style={{ backgroundColor: c.value }}
+                                                                        title={c.name}
+                                                                    />
+                                                                ))}
+                                                            </div>
+
                                                             <div className="flex gap-2">
                                                                 <input 
                                                                     type="text"
@@ -1843,7 +1890,7 @@ export default function Home() {
                                                                     onChange={(e) => setNewListName(e.target.value)}
                                                                     onKeyDown={(e) => {
                                                                         if (e.key === 'Enter' && newListName.trim()) {
-                                                                            handleToggleFavorite(selectedPlace.id.toString(), newListName.trim());
+                                                                            handleToggleFavorite(selectedPlace.id.toString(), newListName.trim(), newListColor);
                                                                             setNewListName("");
                                                                         }
                                                                     }}
@@ -1852,11 +1899,12 @@ export default function Home() {
                                                                 <button 
                                                                     onClick={() => {
                                                                         if (newListName.trim()) {
-                                                                            handleToggleFavorite(selectedPlace.id.toString(), newListName.trim());
+                                                                            handleToggleFavorite(selectedPlace.id.toString(), newListName.trim(), newListColor);
                                                                             setNewListName("");
                                                                         }
                                                                     }}
-                                                                    className="p-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
+                                                                    className="p-2 text-white rounded-lg transition-colors"
+                                                                    style={{ backgroundColor: newListColor }}
                                                                 >
                                                                     <Plus size={14} />
                                                                 </button>

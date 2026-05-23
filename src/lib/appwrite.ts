@@ -117,6 +117,7 @@ const account = {
 };
 
 const mapCollectionToTable = (collectionId: string) => {
+    if (collectionId === 'users') return 'user_accounts';
     return collectionId;
 };
 

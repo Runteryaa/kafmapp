@@ -429,7 +429,7 @@ export default function MapComponent({
     // --- Supercluster Logic for Min Points ---
     const scIndex = useMemo(() => {
         const index = new Supercluster({
-            radius: 40,
+            radius: 80,
             maxZoom: 15,
             minPoints: 6 // Only cluster if 6 or more points
         });
@@ -509,7 +509,7 @@ export default function MapComponent({
                     <>
                         <MarkerClusterGroup
                             chunkedLoading
-                            maxClusterRadius={40}
+                            maxClusterRadius={80}
                             spiderfyOnMaxZoom={true}
                             disableClusteringAtZoom={16}
                             removeOutsideVisibleBounds={true}

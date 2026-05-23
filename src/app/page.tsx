@@ -100,7 +100,7 @@ export default function Home() {
     const [isRatingSubmitting, setIsRatingSubmitting] = useState(false);
 
     // Use the useAuth hook for authentication
-    const { user, logout } = useAuth();
+    const { user, logout, checkUserStatus } = useAuth();
 
     // Panel drag state
     const [panelHeight, setPanelHeight] = useState(60); // vh

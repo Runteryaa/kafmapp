@@ -444,8 +444,8 @@ export default function MapComponent({
     }, [regularPlaces]);
 
     const { clusteredMarkers, individualMarkers } = useMemo(() => {
-        if (!currentBounds || currentZoom >= 17) {
-            return { clusteredMarkers: [], individualMarkers: regularPlaces };
+        if (!currentBounds) {
+            return { clusteredMarkers: [], individualMarkers: [] };
         }
 
         const bbox: [number, number, number, number] = [
@@ -456,15 +456,23 @@ export default function MapComponent({
         ];
 
         try {
-            const clusters = scIndex.getClusters(bbox, Math.floor(currentZoom));
+            // Determine calculation zoom - cap at index maxZoom but allow checking higher zooms
+            const queryZoom = Math.floor(currentZoom);
+            const clusters = scIndex.getClusters(bbox, queryZoom);
             const clustered: Place[] = [];
             const individual: Place[] = [];
 
             clusters.forEach(c => {
                 if (c.properties?.cluster) {
-                    // Large cluster (6+ points due to scIndex config)
-                    const leaves = scIndex.getLeaves(c.id as number, Infinity);
-                    clustered.push(...leaves.map(l => l.properties.place));
+                    // If zoom is very high (>= 17), we "open" the visible clusters into individual markers
+                    if (currentZoom >= 17) {
+                        const leaves = scIndex.getLeaves(c.id as number, Infinity);
+                        individual.push(...leaves.map(l => l.properties.place));
+                    } else {
+                        // Regular cluster (6+ points due to scIndex config)
+                        const leaves = scIndex.getLeaves(c.id as number, Infinity);
+                        clustered.push(...leaves.map(l => l.properties.place));
+                    }
                 } else {
                     // Single point or member of a small group that didn't cluster
                     individual.push(c.properties.place);
@@ -474,9 +482,9 @@ export default function MapComponent({
             return { clusteredMarkers: clustered, individualMarkers: individual };
         } catch (e) {
             console.error("Supercluster calculation failed", e);
-            return { clusteredMarkers: [], individualMarkers: regularPlaces };
+            return { clusteredMarkers: [], individualMarkers: [] };
         }
-    }, [scIndex, currentBounds, currentZoom, regularPlaces]);
+    }, [scIndex, currentBounds, currentZoom]);
 
     return (
         <div style={{ height: "100%", width: "100%", position: "absolute", inset: 0 }}>

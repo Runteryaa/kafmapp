@@ -1505,8 +1505,12 @@ export default function Home() {
                             </div>
                             <button
                                 onClick={() => {
-                                    setFilterType('favorites');
-                                    setListFilter(null);
+                                    if (filterType === 'favorites' && !listFilter) {
+                                        setFilterType('all');
+                                    } else {
+                                        setFilterType('favorites');
+                                        setListFilter(null);
+                                    }
                                     setIsBurgerMenuOpen(false);
                                 }}
                                 className={`px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between text-sm font-medium transition-colors w-full text-left ${filterType === 'favorites' && !listFilter ? 'text-pink-600 bg-pink-50/50 dark:bg-pink-900/10' : 'text-gray-700 dark:text-gray-200'}`}
@@ -1528,8 +1532,13 @@ export default function Home() {
                                         <button
                                             key={listName}
                                             onClick={() => {
-                                                setFilterType('favorites');
-                                                setListFilter(listName);
+                                                if (listFilter === listName && filterType === 'favorites') {
+                                                    setFilterType('all');
+                                                    setListFilter(null);
+                                                } else {
+                                                    setFilterType('favorites');
+                                                    setListFilter(listName);
+                                                }
                                                 setIsBurgerMenuOpen(false);
                                             }}
                                             className={`px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between text-xs font-medium transition-colors w-full text-left pl-11 ${listFilter === listName ? 'bg-gray-50 dark:bg-gray-700/50' : 'text-gray-500 dark:text-gray-400'}`}
@@ -2250,17 +2259,35 @@ export default function Home() {
                                         <Filter size={14} />
                                     </div>
                                     <select
-                                        value={filterType}
+                                        value={filterType === 'favorites' && listFilter ? `list:${listFilter}` : filterType}
                                         onChange={(e) => {
-                                            const newVal = e.target.value as any;
-                                            setFilterType(newVal);
-                                            localStorage.setItem('filterType', newVal);
+                                            const val = e.target.value;
+                                            if (val.startsWith('list:')) {
+                                                const listName = val.replace('list:', '');
+                                                setFilterType('favorites');
+                                                setListFilter(listName);
+                                            } else {
+                                                setFilterType(val as any);
+                                                setListFilter(null);
+                                            }
                                         }}
                                         className="w-full appearance-none bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-[11px] font-bold py-2.5 pl-9 pr-8 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm outline-none hover:border-amber-300 dark:hover:border-amber-900/50 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all cursor-pointer"
                                     >
                                         <option value="all">{t.all}</option>
                                         <option value="registered">{t.registered}</option>
                                         <option value="unregistered">{t.unregistered}</option>
+                                        
+                                        {/* User Collections */}
+                                        {Array.from(new Set(favorites.map(f => f.listType).filter(Boolean))).length > 0 && (
+                                            <optgroup label={t.myLists || "Listelerim"}>
+                                                <option value="favorites">{t.allLists || "Tüm Kaydedilenler"}</option>
+                                                {Array.from(new Set(favorites.map(f => f.listType).filter(Boolean))).map(listName => (
+                                                    <option key={listName} value={`list:${listName}`}>
+                                                        {listName}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        )}
                                     </select>
                                     <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none group-focus-within:rotate-180 transition-transform duration-200">
                                         <ChevronDown size={14} />

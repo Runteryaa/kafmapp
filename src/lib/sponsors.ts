@@ -8,7 +8,7 @@ export const activeSponsors: Sponsor[] = [
         title: "referRun",
         description: "En popüler uygulamaların güncel referans kodlarını keşfedin! Arkadaşlarınızı davet edin ve birlikte kazanmaya başlayın. referRun ile fırsatları kaçırmayın.",
         linkUrl: "https://referrun.runte.workers.dev",
-        isActive: true,
+        isActive: false,
         position: "bottom"
     }
 ];

@@ -122,7 +122,6 @@ const account = {
             email: email,
             password: hashedPassword,
             name: name || '',
-            role: 'user',
             createdat: new Date().toISOString()
         };
         
@@ -148,6 +147,7 @@ const account = {
 
 const mapCollectionToTable = (collectionId: string) => {
     if (collectionId === 'users') return 'user_accounts';
+    if (collectionId === 'reviews') return 'reviews_list';
     return collectionId;
 };
 

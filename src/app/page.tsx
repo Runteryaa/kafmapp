@@ -1237,14 +1237,14 @@ export default function Home() {
             history = [];
         }
 
-        // Clean up history (older than 5 mins)
-        history = history.filter(time => now - time < 5 * 60 * 1000);
+        // Clean up history (older than 3 mins)
+        history = history.filter(time => now - time < 3 * 60 * 1000);
         
         // Add current
         const newHistory = [...history, now];
         localStorage.setItem('submission_history', JSON.stringify(newHistory));
 
-        // Threshold: More than 3 submissions in 5 minutes is spam
+        // Threshold: More than 3 submissions in 3 minutes is spam
         return history.length >= 3;
     }, []);
 

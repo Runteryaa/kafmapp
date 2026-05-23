@@ -430,7 +430,7 @@ export default function MapComponent({
     const scIndex = useMemo(() => {
         const index = new Supercluster({
             radius: 120,
-            maxZoom: 15,
+            maxZoom: 16,
             minPoints: 4 // Only cluster if 4 or more points
         });
         
@@ -444,7 +444,7 @@ export default function MapComponent({
     }, [regularPlaces]);
 
     const { clusteredMarkers, individualMarkers } = useMemo(() => {
-        if (!currentBounds || currentZoom >= 16) {
+        if (!currentBounds || currentZoom >= 17) {
             return { clusteredMarkers: [], individualMarkers: regularPlaces };
         }
 
@@ -511,7 +511,7 @@ export default function MapComponent({
                             chunkedLoading
                             maxClusterRadius={120}
                             spiderfyOnMaxZoom={true}
-                            disableClusteringAtZoom={16}
+                            disableClusteringAtZoom={17}
                             removeOutsideVisibleBounds={true}
                         >
                             {clusteredMarkers.map((place) => (

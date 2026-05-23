@@ -320,7 +320,12 @@ const databases = {
     getDocument: async (databaseId: string, collectionId: string, documentId: string) => {
         const table = mapCollectionToTable(collectionId);
         const ordsId = table === 'places' && documentId.startsWith('place_') ? documentId.replace('place_', '') : documentId;
-        const url = `${BASE_URL}/${table}/${ordsId}`;
+
+        // Use custom path for user accounts
+        const url = table === 'user_accounts' 
+            ? `${BASE_URL}/${table}/id/${ordsId}`
+            : `${BASE_URL}/${table}/${ordsId}`;
+
         const response = await fetch(url);
         if (!response.ok) {
             const err: any = new Error(`Failed to fetch document ${documentId}`);
@@ -367,7 +372,11 @@ const databases = {
     updateDocument: async (databaseId: string, collectionId: string, documentId: string, data: any) => {
         const table = mapCollectionToTable(collectionId);
         const ordsId = table === 'places' && documentId.startsWith('place_') ? documentId.replace('place_', '') : documentId;
-        const url = `${BASE_URL}/${table}/${ordsId}`;
+        
+        // Use custom path for user updates
+        const url = table === 'user_accounts' 
+            ? `${BASE_URL}/${table}/id/${ordsId}`
+            : `${BASE_URL}/${table}/${ordsId}`;
 
         let mergedNormalized = { ...data };
         try {

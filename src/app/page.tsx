@@ -1134,6 +1134,8 @@ export default function Home() {
 
         setIsAddPlaceLoading(true);
         try {
+            const isSpam = checkIsSpam();
+
             // Generate a random numeric ID for the new place
             const numericId = Math.floor(Math.random() * 1000000000);
             const tempId = numericId.toString();
@@ -1150,26 +1152,28 @@ export default function Home() {
 
             const docId = `place_${tempId}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
 
-            // Instantly add to DB so it appears on the map for everyone
-            try {
-                await databases.createDocument('kafmap', 'places', docId, payload);
-                // Also update local state so it appears immediately!
-                setDbPlaces(prev => [...prev, {
-                    id: numericId,
-                    name: payload.name,
-                    lat: parseFloat(payload.lat),
-                    lng: parseFloat(payload.lng),
-                    type: payload.type as any,
-                    address: payload.address,
-                    toiletPass: payload.toiletPass || null,
-                    wifiPass: payload.wifiPass || null,
-                    menuUrl: payload.menuUrl || null,
-                    rating: 0,
-                    menu: [],
-                    isRegistered: true
-                }]);
-            } catch (e: any) {
-                if (e.code === 409) await databases.updateDocument('kafmap', 'places', docId, payload);
+            // ONLY Instantly add to DB if NOT spam
+            if (!isSpam) {
+                try {
+                    await databases.createDocument('kafmap', 'places', docId, payload);
+                    // Also update local state so it appears immediately!
+                    setDbPlaces(prev => [...prev, {
+                        id: numericId,
+                        name: payload.name,
+                        lat: parseFloat(payload.lat),
+                        lng: parseFloat(payload.lng),
+                        type: payload.type as any,
+                        address: payload.address,
+                        toiletPass: payload.toiletPass || null,
+                        wifiPass: payload.wifiPass || null,
+                        menuUrl: payload.menuUrl || null,
+                        rating: 0,
+                        menu: [],
+                        isRegistered: true
+                    }]);
+                } catch (e: any) {
+                    if (e.code === 409) await databases.updateDocument('kafmap', 'places', docId, payload);
+                }
             }
 
             // Submit as a pending update (type: add) for admin moderation
@@ -1179,10 +1183,15 @@ export default function Home() {
                 type: 'add',
                 payload: JSON.stringify(payload),
                 status: 'pending',
+                isSpam: isSpam ? 'true' : 'false',
                 createdAt: new Date().toISOString()
             });
 
-            showToast(t.changesSubmittedForAdmin);
+            if (isSpam) {
+                showToast("Şüpheli işlem tespit edildi. Mekan onaylandıktan sonra haritada görünecektir.");
+            } else {
+                showToast(t.changesSubmittedForAdmin);
+            }
             setIsAddModalOpen(false);
             setNewPlaceData({
                 name: "",
@@ -1217,6 +1226,27 @@ export default function Home() {
         setToastMessage(message);
         setTimeout(() => setToastMessage(null), 2500);
     };
+
+    const checkIsSpam = useCallback(() => {
+        const now = Date.now();
+        const historyRaw = localStorage.getItem('submission_history');
+        let history: number[] = [];
+        try {
+            history = JSON.parse(historyRaw || '[]');
+        } catch (e) {
+            history = [];
+        }
+
+        // Clean up history (older than 5 mins)
+        history = history.filter(time => now - time < 5 * 60 * 1000);
+        
+        // Add current
+        const newHistory = [...history, now];
+        localStorage.setItem('submission_history', JSON.stringify(newHistory));
+
+        // Threshold: More than 3 submissions in 5 minutes is spam
+        return history.length >= 3;
+    }, []);
 
     const getDaysDiff = (dateStr: string | undefined | null) => {
         if (!dateStr) return -1;
@@ -1781,6 +1811,7 @@ export default function Home() {
                     showToast(t.changesSubmittedForAdmin);
                 }}
                 t={t}
+                checkIsSpam={checkIsSpam}
             />
 
             {/* Toast Notification */}
@@ -2552,6 +2583,7 @@ export default function Home() {
                 onClose={() => setIsReportModalOpen(false)}
                 place={selectedPlace || null}
                 t={t}
+                checkIsSpam={checkIsSpam}
                 onSuccess={() => {
                     showToast(t.reportSubmitted);
                     // Manually fetch reports to update UI instantly without needing a full reload

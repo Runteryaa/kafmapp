@@ -9,13 +9,15 @@ export function UpdateInfoModal({
     onClose,
     place,
     onSuccess,
-    t
+    t,
+    checkIsSpam
 }: {
     isOpen: boolean;
     onClose: () => void;
     place: Place | null;
     onSuccess: () => void;
     t: any;
+    checkIsSpam: () => boolean;
 }) {
     const [toiletPass, setToiletPass] = useState("");
     const [wifiPass, setWifiPass] = useState("");
@@ -58,8 +60,10 @@ export function UpdateInfoModal({
         };
 
         try {
-            // If the place is not registered yet, register it instantly to show on map, but still queue for moderation
-            if (!place.isRegistered) {
+            const isSpam = checkIsSpam();
+
+            // If the place is not registered yet, register it instantly to show on map, but only IF NOT SPAM
+            if (!place.isRegistered && !isSpam) {
                 const docId = `place_${place.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
                 const instantPayload = { ...payload, isRegistered: true, ratingSum: "0", ratingCount: "0" };
                 try {
@@ -74,7 +78,8 @@ export function UpdateInfoModal({
                 placeId: place.id.toString(),
                 placeName: place.name,
                 type: 'update',
-                payload: JSON.stringify(payload)
+                payload: JSON.stringify(payload),
+                isSpam: isSpam ? 'true' : 'false'
             });
 
             onSuccess();

@@ -9,9 +9,10 @@ interface ReportModalProps {
     place: Place | null;
     t: any;
     onSuccess: () => void;
+    checkIsSpam: () => boolean;
 }
 
-export default function ReportModal({ isOpen, onClose, place, t, onSuccess }: ReportModalProps) {
+export default function ReportModal({ isOpen, onClose, place, t, onSuccess, checkIsSpam }: ReportModalProps) {
     const [reason, setReason] = useState<string>('');
     const [details, setDetails] = useState('');
     const [contactInfo, setContactInfo] = useState('');
@@ -40,6 +41,8 @@ export default function ReportModal({ isOpen, onClose, place, t, onSuccess }: Re
         setError(null);
 
         try {
+            const isSpam = checkIsSpam();
+
             await databases.createDocument('kafmap', 'pending_updates', ID.unique(), {
                 placeId: place.id.toString(),
                 placeName: place.name,
@@ -50,7 +53,8 @@ export default function ReportModal({ isOpen, onClose, place, t, onSuccess }: Re
                     details: details.trim(),
                     contactInfo: contactInfo.trim(),
                     date: new Date().toISOString()
-                })
+                }),
+                isSpam: isSpam ? 'true' : 'false'
             });
 
             onSuccess();

@@ -15,7 +15,7 @@ export default function AdminPage() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [passwordInput, setPasswordInput] = useState("");
     const [activeTab, setActiveTab] = useState<Tab>('submissions');
-    const [submissionSubTab, setSubmissionSubTab] = useState<'all' | 'reports' | 'additions' | 'updates'>('all');
+    const [submissionSubTab, setSubmissionSubTab] = useState<'all' | 'reports' | 'additions' | 'updates' | 'spam'>('all');
     const [isLoading, setIsLoading] = useState(false);
     
     // Data states
@@ -31,11 +31,16 @@ export default function AdminPage() {
     const [isSavingVenue, setIsSavingVenue] = useState(false);
 
     const filteredSubmissions = useMemo(() => {
-        if (submissionSubTab === 'all') return pendingUpdates;
-        if (submissionSubTab === 'reports') return pendingUpdates.filter(s => s.type === 'report');
-        if (submissionSubTab === 'additions') return pendingUpdates.filter(s => s.type === 'add');
-        if (submissionSubTab === 'updates') return pendingUpdates.filter(s => s.type === 'update');
-        return pendingUpdates;
+        // 'all' tab should NOT show spam by default to keep it clean
+        if (submissionSubTab === 'all') return pendingUpdates.filter(s => s.isSpam !== 'true');
+        if (submissionSubTab === 'spam') return pendingUpdates.filter(s => s.isSpam === 'true');
+        
+        // Other tabs show non-spam items of that type
+        const nonSpam = pendingUpdates.filter(s => s.isSpam !== 'true');
+        if (submissionSubTab === 'reports') return nonSpam.filter(s => s.type === 'report');
+        if (submissionSubTab === 'additions') return nonSpam.filter(s => s.type === 'add');
+        if (submissionSubTab === 'updates') return nonSpam.filter(s => s.type === 'update');
+        return nonSpam;
     }, [pendingUpdates, submissionSubTab]);
 
     // Simple hardcoded password for now.
@@ -439,35 +444,41 @@ export default function AdminPage() {
                                     onClick={() => setSubmissionSubTab('all')}
                                     className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${submissionSubTab === 'all' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                                 >
-                                    All ({pendingUpdates.length})
+                                    All ({pendingUpdates.filter(s => s.isSpam !== 'true').length})
                                 </button>
                                 <button 
                                     onClick={() => setSubmissionSubTab('reports')}
                                     className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${submissionSubTab === 'reports' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                                 >
-                                    User Reports ({pendingUpdates.filter(s => s.type === 'report').length})
+                                    User Reports ({pendingUpdates.filter(s => s.type === 'report' && s.isSpam !== 'true').length})
                                 </button>
                                 <button 
                                     onClick={() => setSubmissionSubTab('additions')}
                                     className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${submissionSubTab === 'additions' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                                 >
-                                    New Venues ({pendingUpdates.filter(s => s.type === 'add').length})
+                                    New Venues ({pendingUpdates.filter(s => s.type === 'add' && s.isSpam !== 'true').length})
                                 </button>
                                 <button 
                                     onClick={() => setSubmissionSubTab('updates')}
                                     className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${submissionSubTab === 'updates' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
                                 >
-                                    Info Updates ({pendingUpdates.filter(s => s.type === 'update').length})
+                                    Info Updates ({pendingUpdates.filter(s => s.type === 'update' && s.isSpam !== 'true').length})
+                                </button>
+                                <button 
+                                    onClick={() => setSubmissionSubTab('spam')}
+                                    className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${submissionSubTab === 'spam' ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                >
+                                    Suspicious / Spam ({pendingUpdates.filter(s => s.isSpam === 'true').length})
                                 </button>
                             </div>
 
                             {filteredSubmissions.length === 0 ? (
                                 <div className="bg-white dark:bg-gray-800 rounded-[32px] p-16 text-center border border-dashed border-gray-200 dark:border-gray-700 shadow-sm">
-                                    <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${submissionSubTab === 'reports' ? 'bg-red-50 dark:bg-red-900/20' : submissionSubTab === 'additions' ? 'bg-emerald-50 dark:bg-emerald-900/20' : submissionSubTab === 'updates' ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-green-50 dark:bg-green-900/20'}`}>
-                                        <Check size={48} className={submissionSubTab === 'reports' ? 'text-red-500' : submissionSubTab === 'additions' ? 'text-emerald-500' : submissionSubTab === 'updates' ? 'text-blue-500' : 'text-green-500'} />
+                                    <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${submissionSubTab === 'reports' ? 'bg-red-50 dark:bg-red-900/20' : submissionSubTab === 'additions' ? 'bg-emerald-50 dark:bg-emerald-900/20' : submissionSubTab === 'updates' ? 'bg-blue-50 dark:bg-blue-900/20' : submissionSubTab === 'spam' ? 'bg-orange-50 dark:bg-orange-900/20' : 'bg-green-50 dark:bg-green-900/20'}`}>
+                                        <Check size={48} className={submissionSubTab === 'reports' ? 'text-red-500' : submissionSubTab === 'additions' ? 'text-emerald-500' : submissionSubTab === 'updates' ? 'text-blue-500' : submissionSubTab === 'spam' ? 'text-orange-500' : 'text-green-500'} />
                                     </div>
-                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white">Clean Slate!</h3>
-                                    <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">No {submissionSubTab === 'all' ? 'pending' : submissionSubTab.slice(0, -1)} submissions found in this category.</p>
+                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white">{submissionSubTab === 'spam' ? 'No Spam Detected!' : 'Clean Slate!'}</h3>
+                                    <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">No {submissionSubTab === 'all' ? 'pending' : submissionSubTab === 'spam' ? 'suspicious' : submissionSubTab.slice(0, -1)} submissions found in this category.</p>
                                 </div>
                             ) : (
                                 <div className="grid grid-cols-1 gap-6">

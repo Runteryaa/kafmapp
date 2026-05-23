@@ -187,6 +187,7 @@ export default function Home() {
     }, [fetchFavorites]);
 
     const handleToggleFavorite = async (placeId: string, listType: string, listColor?: string) => {
+        await checkUserStatus(); // Verify session
         if (isUserBanned()) return;
         if (!user) {
             showToast(t.loginToUpdate || "Lütfen giriş yapın");
@@ -865,6 +866,7 @@ export default function Home() {
     };
 
     const handleRatePlace = async (ratingValue: number) => {
+        await checkUserStatus(); // Verify session still exists in DB
         if (isUserBanned()) return;
         if (!user) {
             showToast(t.loginToRate);
@@ -1116,7 +1118,8 @@ export default function Home() {
         // On mobile, this keeps the panel open but switches back to search results/nearby list
     }, []);
 
-    const handleOpenUpdateModal = () => {
+    const handleOpenUpdateModal = async () => {
+        await checkUserStatus(); // Verify session
         if (isUserBanned()) return;
         if (!user) {
             showToast(t.loginToUpdate);
@@ -1144,6 +1147,7 @@ export default function Home() {
 
     const handleAddPlaceSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        await checkUserStatus(); // Verify session
         if (isUserBanned()) return;
         if (!user) {
             showToast(t.loginToUpdate);

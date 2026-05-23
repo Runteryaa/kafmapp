@@ -15,6 +15,7 @@ export default function AdminPage() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [passwordInput, setPasswordInput] = useState("");
     const [activeTab, setActiveTab] = useState<Tab>('submissions');
+    const [submissionSubTab, setSubmissionSubTab] = useState<'all' | 'reports' | 'additions' | 'updates'>('all');
     const [isLoading, setIsLoading] = useState(false);
     
     // Data states
@@ -28,6 +29,14 @@ export default function AdminPage() {
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
     const [editingVenue, setEditingVenue] = useState<Place | null>(null);
     const [isSavingVenue, setIsSavingVenue] = useState(false);
+
+    const filteredSubmissions = useMemo(() => {
+        if (submissionSubTab === 'all') return pendingUpdates;
+        if (submissionSubTab === 'reports') return pendingUpdates.filter(s => s.type === 'report');
+        if (submissionSubTab === 'additions') return pendingUpdates.filter(s => s.type === 'add');
+        if (submissionSubTab === 'updates') return pendingUpdates.filter(s => s.type === 'update');
+        return pendingUpdates;
+    }, [pendingUpdates, submissionSubTab]);
 
     // Simple hardcoded password for now.
     const ADMIN_PASSWORD = "admin";
@@ -423,88 +432,124 @@ export default function AdminPage() {
                     )}
 
                     {!isLoading && activeTab === 'submissions' && (
-                        pendingUpdates.length === 0 ? (
-                            <div className="bg-white dark:bg-gray-800 rounded-3xl p-16 text-center border border-dashed border-gray-200 dark:border-gray-700">
-                                <div className="w-24 h-24 bg-green-50 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                                    <Check size={48} className="text-green-500" />
+                        <>
+                            {/* Sub-tabs for Submissions */}
+                            <div className="flex flex-wrap gap-2 mb-8 bg-white dark:bg-gray-800 p-2 rounded-[20px] border border-gray-100 dark:border-gray-800 shadow-sm">
+                                <button 
+                                    onClick={() => setSubmissionSubTab('all')}
+                                    className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${submissionSubTab === 'all' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                >
+                                    All ({pendingUpdates.length})
+                                </button>
+                                <button 
+                                    onClick={() => setSubmissionSubTab('reports')}
+                                    className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${submissionSubTab === 'reports' ? 'bg-red-500 text-white shadow-lg shadow-red-500/20' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                >
+                                    User Reports ({pendingUpdates.filter(s => s.type === 'report').length})
+                                </button>
+                                <button 
+                                    onClick={() => setSubmissionSubTab('additions')}
+                                    className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${submissionSubTab === 'additions' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                >
+                                    New Venues ({pendingUpdates.filter(s => s.type === 'add').length})
+                                </button>
+                                <button 
+                                    onClick={() => setSubmissionSubTab('updates')}
+                                    className={`px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all ${submissionSubTab === 'updates' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                                >
+                                    Info Updates ({pendingUpdates.filter(s => s.type === 'update').length})
+                                </button>
+                            </div>
+
+                            {filteredSubmissions.length === 0 ? (
+                                <div className="bg-white dark:bg-gray-800 rounded-[32px] p-16 text-center border border-dashed border-gray-200 dark:border-gray-700 shadow-sm">
+                                    <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 ${submissionSubTab === 'reports' ? 'bg-red-50 dark:bg-red-900/20' : submissionSubTab === 'additions' ? 'bg-emerald-50 dark:bg-emerald-900/20' : submissionSubTab === 'updates' ? 'bg-blue-50 dark:bg-blue-900/20' : 'bg-green-50 dark:bg-green-900/20'}`}>
+                                        <Check size={48} className={submissionSubTab === 'reports' ? 'text-red-500' : submissionSubTab === 'additions' ? 'text-emerald-500' : submissionSubTab === 'updates' ? 'text-blue-500' : 'text-green-500'} />
+                                    </div>
+                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white">Clean Slate!</h3>
+                                    <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">No {submissionSubTab === 'all' ? 'pending' : submissionSubTab.slice(0, -1)} submissions found in this category.</p>
                                 </div>
-                                <h3 className="text-2xl font-black text-gray-900 dark:text-white">Inbox Zero!</h3>
-                                <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">No pending submissions are waiting for your attention.</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 gap-6">
-                                {pendingUpdates.map((doc) => {
-                                    let parsedPayload: any = {};
-                                    let parsedMenu: any[] = [];
-                                    try {
-                                        parsedPayload = JSON.parse(doc.payload);
-                                        if (parsedPayload.menu) parsedMenu = JSON.parse(parsedPayload.menu);
-                                    } catch (e) {}
+                            ) : (
+                                <div className="grid grid-cols-1 gap-6">
+                                    {filteredSubmissions.map((doc) => {
+                                        let parsedPayload: any = {};
+                                        let parsedMenu: any[] = [];
+                                        try {
+                                            parsedPayload = JSON.parse(doc.payload);
+                                            if (parsedPayload.menu) parsedMenu = JSON.parse(parsedPayload.menu);
+                                        } catch (e) {}
 
-                                    return (
-                                        <div key={doc.$id} className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl shadow-gray-200/20 dark:shadow-none border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col lg:flex-row group transition-all hover:border-amber-200">
-                                            <div className="p-8 flex-1">
-                                                <div className="flex items-center gap-3 mb-6">
-                                                    <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl ${doc.type === 'report' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : doc.type === 'add' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/30' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30'}`}>
-                                                        {doc.type === 'report' ? 'User Report' : doc.type === 'add' ? 'New Venue Registration' : 'Update Request'}
-                                                    </span>
-                                                    <span className="text-[10px] text-gray-400 font-mono font-bold bg-gray-50 dark:bg-gray-900/50 px-3 py-1.5 rounded-xl"># {doc.placeId}</span>
-                                                </div>
-                                                <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{doc.placeName}</h3>
-                                                <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2 font-medium"><MapPin size={16} className="text-amber-500" /> {parsedPayload.address || "Address unavailable"}</p>
-
-                                                {doc.type === 'report' ? (
-                                                    <div className="mt-8 bg-red-50/50 dark:bg-red-900/10 p-6 rounded-2xl border border-red-100 dark:border-red-900/30">
-                                                        <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                            <AlertCircle size={14} /> Reason for Report
-                                                        </p>
-                                                        <p className="text-lg font-bold text-gray-900 dark:text-white leading-relaxed">&ldquo;{parsedPayload.reason || "Inaccurate information"}&rdquo;</p>
-                                                        <p className="text-xs text-gray-400 mt-4 font-bold">{parsedPayload.date ? new Date(parsedPayload.date).toLocaleString() : ''}</p>
+                                        return (
+                                            <div key={doc.$id} className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl shadow-gray-200/20 dark:shadow-none border border-gray-100 dark:border-gray-700 overflow-hidden flex flex-col lg:flex-row group transition-all hover:border-amber-200">
+                                                <div className="p-8 flex-1">
+                                                    <div className="flex items-center gap-3 mb-6">
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl ${doc.type === 'report' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : doc.type === 'add' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30'}`}>
+                                                            {doc.type === 'report' ? 'User Report' : doc.type === 'add' ? 'New Venue Registration' : 'Update Request'}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray-400 font-mono font-bold bg-gray-50 dark:bg-gray-900/50 px-3 py-1.5 rounded-xl"># {doc.placeId}</span>
                                                     </div>
-                                                ) : (
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
-                                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-2"><KeyRound size={12} className="text-amber-500" /> Toilet Code</p>
-                                                            <p className="text-lg font-black text-gray-900 dark:text-white">{parsedPayload.toiletPass || <span className="text-gray-400 italic font-medium opacity-50">Empty</span>}</p>
+                                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{doc.placeName}</h3>
+                                                    <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2 font-medium"><MapPin size={16} className="text-amber-500" /> {parsedPayload.address || "Address unavailable"}</p>
+
+                                                    {doc.type === 'report' ? (
+                                                        <div className="mt-8 bg-red-50/50 dark:bg-red-900/10 p-6 rounded-2xl border border-red-100 dark:border-red-900/30">
+                                                            <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                                <AlertCircle size={14} /> Reason for Report
+                                                            </p>
+                                                            <p className="text-lg font-bold text-gray-900 dark:text-white leading-relaxed">&ldquo;{parsedPayload.reason || "Inaccurate information"}&rdquo;</p>
+                                                            {parsedPayload.contactInfo && (
+                                                                <div className="mt-4 pt-4 border-t border-red-100 dark:border-red-900/30">
+                                                                    <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1 italic">Contact Info (Business Owner)</p>
+                                                                    <p className="text-sm font-bold text-gray-900 dark:text-white">{parsedPayload.contactInfo}</p>
+                                                                </div>
+                                                            )}
+                                                            <p className="text-xs text-gray-400 mt-4 font-bold">{parsedPayload.date ? new Date(parsedPayload.date).toLocaleString() : ''}</p>
                                                         </div>
-                                                        <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-2"><Wifi size={12} className="text-blue-500" /> Wifi Password</p>
-                                                            <p className="text-lg font-black text-gray-900 dark:text-white">{parsedPayload.wifiPass || <span className="text-gray-400 italic font-medium opacity-50">Empty</span>}</p>
-                                                        </div>
-                                                        {parsedPayload.menuUrl && (
-                                                            <div className="md:col-span-2 bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-2"><Link size={12} className="text-green-500" /> External Menu URL</p>
-                                                                <a href={parsedPayload.menuUrl} target="_blank" rel="noreferrer" className="text-sm font-bold text-amber-600 hover:underline break-all block">
-                                                                    {parsedPayload.menuUrl} <ExternalLink size={12} className="inline ml-1" />
-                                                                </a>
+                                                    ) : (
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+                                                            <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-2"><KeyRound size={12} className="text-amber-500" /> Toilet Code</p>
+                                                                <p className="text-lg font-black text-gray-900 dark:text-white">{parsedPayload.toiletPass || <span className="text-gray-400 italic font-medium opacity-50">Empty</span>}</p>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
+                                                            <div className="bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-2"><Wifi size={12} className="text-blue-500" /> Wifi Password</p>
+                                                                <p className="text-lg font-black text-gray-900 dark:text-white">{parsedPayload.wifiPass || <span className="text-gray-400 italic font-medium opacity-50">Empty</span>}</p>
+                                                            </div>
+                                                            {parsedPayload.menuUrl && (
+                                                                <div className="md:col-span-2 bg-gray-50 dark:bg-gray-900/50 p-5 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-2"><Link size={12} className="text-green-500" /> External Menu URL</p>
+                                                                    <a href={parsedPayload.menuUrl} target="_blank" rel="noreferrer" className="text-sm font-bold text-amber-600 hover:underline break-all block">
+                                                                        {parsedPayload.menuUrl} <ExternalLink size={12} className="inline ml-1" />
+                                                                    </a>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                            <div className="p-8 lg:w-72 bg-gray-50/50 dark:bg-gray-900/30 flex flex-col justify-center gap-4">
-                                                <button
-                                                    onClick={() => handleApprove(doc)}
-                                                    disabled={actionLoadingId === doc.$id}
-                                                    className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-green-500/20 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
-                                                >
-                                                    {actionLoadingId === doc.$id ? <Loader2 size={18} className="animate-spin" /> : <Check size={20} strokeWidth={3} />}
-                                                    {doc.type === 'report' ? 'Dismiss' : 'Approve'}
-                                                </button>
-                                                <button
-                                                    onClick={() => handleReject(doc.$id)}
-                                                    disabled={actionLoadingId === doc.$id}
-                                                    className="w-full bg-white dark:bg-gray-800 text-red-500 border-2 border-red-100 dark:border-red-900/20 hover:bg-red-50 dark:hover:bg-red-900/20 font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
-                                                >
-                                                    <Trash2 size={18} /> Reject
-                                                </button>
+                                                <div className="p-8 lg:w-72 bg-gray-50/50 dark:bg-gray-900/30 flex flex-col justify-center gap-4">
+                                                    <button
+                                                        onClick={() => handleApprove(doc)}
+                                                        disabled={actionLoadingId === doc.$id}
+                                                        className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-green-500/20 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+                                                    >
+                                                        {actionLoadingId === doc.$id ? <Loader2 size={18} className="animate-spin" /> : <Check size={20} strokeWidth={3} />}
+                                                        {doc.type === 'report' ? 'Dismiss' : 'Approve'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleReject(doc.$id)}
+                                                        disabled={actionLoadingId === doc.$id}
+                                                        className="w-full bg-white dark:bg-gray-800 text-red-500 border-2 border-red-100 dark:border-red-900/20 hover:bg-red-50 dark:hover:bg-red-900/20 font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 active:scale-95"
+                                                    >
+                                                        <Trash2 size={18} /> Reject
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {!isLoading && activeTab === 'venues' && (

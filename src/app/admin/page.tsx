@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { databases, ID } from '../../lib/appwrite';
+import { getTranslation } from '../../lib/translations';
 import { 
     Check, X, ShieldCheck, Lock, Loader2, MapPin, KeyRound, Wifi, 
     Link, Pencil, Trash2, Search, Plus, Coffee, Utensils, 
@@ -13,6 +14,8 @@ import { User } from 'lucide-react';
 type Tab = 'submissions' | 'venues' | 'reviews' | 'users';
 
 export default function AdminPage() {
+    const [language, setLanguage] = useState<'tr' | 'en'>('tr');
+    const t = getTranslation(language);
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [passwordInput, setPasswordInput] = useState("");
     const [activeTab, setActiveTab] = useState<Tab>('submissions');
@@ -736,17 +739,17 @@ export default function AdminPage() {
                                                 <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-black text-xs uppercase">
                                                     {review.userName ? review.userName.substring(0, 2) : 'U'}
                                                 </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="text-sm font-black text-gray-900 dark:text-white">{review.userName || 'User'}</p>
-                                                        {(review.userRole === 'admin' || review.userRole === 'moderator') && (
-                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${review.userRole === 'admin' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30'}`}>
-                                                                {review.userRole}
-                                                            </span>
-                                                        )}
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="text-sm font-black text-gray-900 dark:text-white">{review.userName || 'User'}</p>
+                                                            {(review.userRole === 'admin' || review.userRole === 'explorer') && (
+                                                                <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${review.userRole === 'admin' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : 'bg-blue-50 text-blue-600 dark:bg-blue-900/30'}`}>
+                                                                    {review.userRole === 'admin' ? 'ADMIN' : 'GEZGİN'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Place ID: {review.placeId}</p>
                                                     </div>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Place ID: {review.placeId}</p>
-                                                </div>
                                             </div>
                                             <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg">
                                                 <Star size={12} className="text-amber-500 fill-amber-500" />
@@ -829,8 +832,8 @@ export default function AdminPage() {
                                                         <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{u.email}</p>
                                                     </td>
                                                     <td className="px-6 py-5">
-                                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg ${u.role === 'admin' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : u.role === 'moderator' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
-                                                            {u.role || 'user'}
+                                                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg ${u.role === 'admin' ? 'bg-red-50 text-red-600 dark:bg-red-900/30' : u.role === 'explorer' ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30' : 'bg-gray-100 text-gray-500 dark:bg-gray-800'}`}>
+                                                            {u.role === 'admin' ? 'admin' : u.role === 'explorer' ? 'explorer' : (u.role || 'user')}
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-5 text-right">
@@ -841,7 +844,7 @@ export default function AdminPage() {
                                                             className="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-xs font-bold py-1.5 px-2 outline-none focus:ring-2 focus:ring-amber-500 transition-all cursor-pointer disabled:opacity-50"
                                                         >
                                                             <option value="user">Set as User</option>
-                                                            <option value="moderator">Set as Moderator</option>
+                                                            <option value="explorer">Set as Explorer</option>
                                                             <option value="admin">Set as Admin</option>
                                                         </select>
                                                     </td>

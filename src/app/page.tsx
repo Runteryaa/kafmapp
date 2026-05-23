@@ -2236,12 +2236,11 @@ export default function Home() {
                                                                 <div>
                                                                    <div className="flex items-center gap-2">
                                                                        <p className="text-sm font-bold text-gray-900 dark:text-white">{review.userName || 'User'}</p>
-                                                                       {((review as any).userRole === 'admin' || (review as any).userRole === 'moderator') && (
+                                                                       {((review as any).userRole === 'admin' || (review as any).userRole === 'explorer') && (
                                                                            <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${(review as any).userRole === 'admin' ? 'bg-red-500 text-white shadow-sm shadow-red-500/20' : 'bg-blue-500 text-white shadow-sm shadow-blue-500/20'}`}>
-                                                                               {(review as any).userRole}
+                                                                               {(review as any).userRole === 'admin' ? t.adminRole : t.explorerRole}
                                                                            </span>
-                                                                       )}
-                                                                   </div>
+                                                                       )}                                                                   </div>
                                                                    <p className="text-[10px] text-gray-500 dark:text-gray-400">
                                                                        {new Date(review.createdAt).toLocaleDateString()}
                                                                    </p>

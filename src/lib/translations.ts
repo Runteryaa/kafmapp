@@ -174,6 +174,8 @@ export const t = {
         iAmOwner: 'I am the business owner',
         contactInfo: 'Contact Information (Email/Phone)',
         contactInfoPlaceholder: 'How can we reach you?',
+        adminRole: 'Admin',
+        explorerRole: 'Explorer',
     },
     tr: {
         searchPlaceholder: 'Kafe veya restoran ara...',
@@ -348,6 +350,8 @@ export const t = {
         iAmOwner: 'İşletme sahibiyim',
         contactInfo: 'İletişim Bilgileri (E-posta/Telefon)',
         contactInfoPlaceholder: 'Size nasıl ulaşabiliriz?',
+        adminRole: 'Yönetici',
+        explorerRole: 'Gezgin',
     }
 };
 

@@ -157,6 +157,11 @@ export default function Home() {
     const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+    const [isManageListsOpen, setIsManageListsOpen] = useState(false);
+    const [isProcessingListAction, setIsProcessingListAction] = useState(false);
+    const [editingListName, setEditingListName] = useState<string | null>(null);
+    const [tempEditName, setTempEditName] = useState("");
+    const [tempEditColor, setTempEditColor] = useState("");
     const [newListName, setNewListName] = useState("");
     const [newListColor, setNewListColor] = useState(LIST_COLORS[0].value);
 
@@ -234,6 +239,63 @@ export default function Home() {
             console.error("Collection update failed:", error);
             showToast("İşlem başarısız");
             fetchFavorites(); // Rollback
+        }
+    };
+
+    const handleRenameList = async (oldName: string, newName: string) => {
+        if (!user || !newName.trim() || oldName === newName) return;
+        setIsProcessingListAction(true);
+        try {
+            const listItems = favorites.filter(f => f.listType?.toLowerCase() === oldName.toLowerCase());
+            await Promise.all(listItems.map(item => 
+                databases.updateDocument('kafmap', 'favorites', item.$id, { listType: newName.trim() })
+            ));
+            showToast(t.listRenamed || "Liste yeniden adlandırıldı");
+            await fetchFavorites();
+        } catch (error) {
+            console.error("Rename failed:", error);
+            showToast("İşlem başarısız");
+        } finally {
+            setIsProcessingListAction(false);
+        }
+    };
+
+    const handleDeleteList = async (listName: string) => {
+        if (!user) return;
+        if (!confirm(t.deleteListConfirm || `${listName} listesini silmek istediğinize emin misiniz?`)) return;
+        
+        setIsProcessingListAction(true);
+        try {
+            const listItems = favorites.filter(f => f.listType?.toLowerCase() === listName.toLowerCase());
+            await Promise.all(listItems.map(item => 
+                databases.deleteDocument('kafmap', 'favorites', item.$id)
+            ));
+            showToast(t.listDeleted || "Liste silindi");
+            if (listFilter === listName) setListFilter(null);
+            await fetchFavorites();
+        } catch (error) {
+            console.error("Delete failed:", error);
+            showToast("İşlem başarısız");
+        } finally {
+            setIsProcessingListAction(false);
+        }
+    };
+
+    const handleUpdateListColor = async (listName: string, newColor: string) => {
+        if (!user) return;
+        setIsProcessingListAction(true);
+        try {
+            const listItems = favorites.filter(f => f.listType?.toLowerCase() === listName.toLowerCase());
+            await Promise.all(listItems.map(item => 
+                databases.updateDocument('kafmap', 'favorites', item.$id, { listColor: newColor })
+            ));
+            showToast(t.colorUpdated || "Renk güncellendi");
+            await fetchFavorites();
+        } catch (error) {
+            console.error("Color update failed:", error);
+            showToast("İşlem başarısız");
+        } finally {
+            setIsProcessingListAction(false);
         }
     };
 
@@ -1429,8 +1491,17 @@ export default function Home() {
                             )}
 
                             <div className="h-px bg-gray-100 dark:bg-gray-700 my-1" />
-                            <div className="px-4 py-2">
+                            <div className="px-4 py-2 flex items-center justify-between">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{t.myLists || "Listelerim"}</span>
+                                <button 
+                                    onClick={() => {
+                                        setIsManageListsOpen(true);
+                                        setIsBurgerMenuOpen(false);
+                                    }}
+                                    className="text-[10px] font-bold text-amber-600 hover:text-amber-700 transition-colors uppercase tracking-widest flex items-center gap-1"
+                                >
+                                    <Pencil size={10} /> {t.manage || "Yönet"}
+                                </button>
                             </div>
                             <button
                                 onClick={() => {
@@ -2529,6 +2600,127 @@ export default function Home() {
                                 {t.understood}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Manage Lists Modal */}
+            {isManageListsOpen && (
+                <div className="fixed inset-0 z-[7000] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 rounded-[32px] w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh] border border-gray-100 dark:border-gray-800">
+                        <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-gray-800">
+                            <h2 className="text-xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                                <Settings size={24} className="text-amber-500" />
+                                {t.myLists}
+                            </h2>
+                            <button onClick={() => { setIsManageListsOpen(false); setEditingListName(null); }} className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                            <div className="space-y-4">
+                                {Array.from(new Set(favorites.map(f => f.listType).filter(Boolean))).map(listName => {
+                                    const listItems = favorites.filter(f => f.listType === listName);
+                                    const listColor = listItems[0]?.listColor || '#ec4899';
+                                    const isEditing = editingListName === listName;
+
+                                    return (
+                                        <div key={listName} className={`p-4 rounded-2xl border transition-all ${isEditing ? 'border-amber-500 bg-amber-50/30 dark:bg-amber-900/10' : 'border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30'}`}>
+                                            {isEditing ? (
+                                                <div className="space-y-4">
+                                                    <div className="flex gap-2">
+                                                        <input 
+                                                            type="text"
+                                                            value={tempEditName}
+                                                            onChange={(e) => setTempEditName(e.target.value)}
+                                                            className="flex-1 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+                                                            placeholder={t.renameList}
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex gap-1.5">
+                                                            {LIST_COLORS.map(c => (
+                                                                <button
+                                                                    key={c.value}
+                                                                    onClick={() => setTempEditColor(c.value)}
+                                                                    className={`w-6 h-6 rounded-full border-2 transition-transform ${tempEditColor === c.value ? 'scale-110 border-gray-400 dark:border-white' : 'border-transparent hover:scale-105'}`}
+                                                                    style={{ backgroundColor: c.value }}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <button 
+                                                                onClick={() => setEditingListName(null)}
+                                                                className="px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-700 transition-colors"
+                                                            >
+                                                                {t.cancel}
+                                                            </button>
+                                                            <button 
+                                                                disabled={isProcessingListAction}
+                                                                onClick={async () => {
+                                                                    if (tempEditName !== listName) await handleRenameList(listName, tempEditName);
+                                                                    if (tempEditColor !== listColor) await handleUpdateListColor(tempEditName || listName, tempEditColor);
+                                                                    setEditingListName(null);
+                                                                }}
+                                                                className="bg-amber-500 text-white px-4 py-1.5 rounded-lg text-xs font-black hover:bg-amber-600 transition-all flex items-center gap-2"
+                                                            >
+                                                                {isProcessingListAction && <Loader2 size={12} className="animate-spin" />}
+                                                                {t.done}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: listColor }}></div>
+                                                        <div>
+                                                            <h3 className="font-bold text-gray-900 dark:text-white text-sm">{listName}</h3>
+                                                            <p className="text-[10px] text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">{listItems.length} {t.nearbyPlaces?.toLowerCase()}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setEditingListName(listName);
+                                                                setTempEditName(listName);
+                                                                setTempEditColor(listColor);
+                                                            }}
+                                                            className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors"
+                                                            title={t.edit}
+                                                        >
+                                                            <Pencil size={16} />
+                                                        </button>
+                                                        <button 
+                                                            disabled={isProcessingListAction}
+                                                            onClick={() => handleDeleteList(listName)}
+                                                            className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors"
+                                                            title={t.deleteList}
+                                                        >
+                                                            <Plus size={16} className="rotate-45" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                {Array.from(new Set(favorites.map(f => f.listType).filter(Boolean))).length === 0 && (
+                                    <div className="text-center py-12">
+                                        <Star size={40} className="mx-auto text-gray-200 mb-4" />
+                                        <p className="text-gray-400 text-sm font-medium">Henüz bir listeniz bulunmuyor.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {isProcessingListAction && (
+                            <div className="absolute inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-[1px] flex items-center justify-center z-[10]">
+                                <Loader2 size={32} className="animate-spin text-amber-500" />
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

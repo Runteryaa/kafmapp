@@ -307,10 +307,16 @@ const databases = {
         let createdDoc: any = {};
         try {
             createdDoc = await response.json();
-        } catch (e) {}
+            // Handle both array and object responses from ORDS
+            if (Array.isArray(createdDoc.items)) createdDoc = createdDoc.items[0];
+        } catch (e) {
+            // If response body is empty or invalid, use the payload we sent as base
+            createdDoc = { ...payload };
+        }
         
-        if (!createdDoc.$id) createdDoc.$id = createdDoc.id || createdDoc.ID || finalId;
-        return createdDoc;
+        const normalized = normalizeDoc(createdDoc);
+        if (!normalized.$id) normalized.$id = normalized.id || normalized.ID || finalId;
+        return normalized;
     },
     updateDocument: async (databaseId: string, collectionId: string, documentId: string, data: any) => {
         const table = mapCollectionToTable(collectionId);
@@ -348,10 +354,14 @@ const databases = {
         let updatedDoc: any = {};
         try {
             updatedDoc = await response.json();
-        } catch (e) {}
+            if (Array.isArray(updatedDoc.items)) updatedDoc = updatedDoc.items[0];
+        } catch (e) {
+            updatedDoc = { ...mergedNormalized };
+        }
 
-        if (!updatedDoc.$id) updatedDoc.$id = updatedDoc.id || updatedDoc.ID || documentId;
-        return updatedDoc;
+        const normalized = normalizeDoc(updatedDoc);
+        if (!normalized.$id) normalized.$id = normalized.id || normalized.ID || documentId;
+        return normalized;
     },
     deleteDocument: async (databaseId: string, collectionId: string, documentId: string) => {
         const table = mapCollectionToTable(collectionId);

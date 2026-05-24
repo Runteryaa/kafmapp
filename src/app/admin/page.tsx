@@ -390,17 +390,17 @@ export default function AdminPage() {
 
     const filteredVenues = useMemo(() => {
         return allVenues.filter(v => 
-            v.name.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
-            v.address.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
-            v.id.toString().includes(venueSearchQuery)
+            (v.name || "").toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
+            (v.address || "").toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
+            (v.id || "").toString().includes(venueSearchQuery)
         );
     }, [allVenues, venueSearchQuery]);
 
     const filteredReviews = useMemo(() => {
         return allReviews.filter(r => 
-            r.userName.toLowerCase().includes(reviewSearchQuery.toLowerCase()) ||
+            (r.userName || "").toLowerCase().includes(reviewSearchQuery.toLowerCase()) ||
             (r.commentText || "").toLowerCase().includes(reviewSearchQuery.toLowerCase()) ||
-            r.placeId.toString().includes(reviewSearchQuery)
+            (r.placeId || "").toString().includes(reviewSearchQuery)
         );
     }, [allReviews, reviewSearchQuery]);
 

@@ -276,7 +276,7 @@ const databases = {
         const url = `${BASE_URL}/${table}/`;
         
         const response = await fetch(url, {
-            headers: { 'X-Admin-Token': ADMIN_TOKEN }
+            headers: { 'X-Admin-Token': ADMIN_TOKEN as string }
         });
         if (!response.ok) throw new Error(`Failed to fetch from ${table}`);
         const data = await response.json();
@@ -324,7 +324,7 @@ const databases = {
         const url = `${BASE_URL}/${table}/${ordsId}`;
 
         const response = await fetch(url, {
-            headers: { 'X-Admin-Token': ADMIN_TOKEN }
+            headers: { 'X-Admin-Token': ADMIN_TOKEN as string }
         });        if (!response.ok) {
             const err: any = new Error(`Failed to fetch document ${documentId}`);
             err.code = response.status;
@@ -375,7 +375,7 @@ const databases = {
         let mergedNormalized = { ...data };
         try {
             const getRes = await fetch(url, {
-                headers: { 'X-Admin-Token': ADMIN_TOKEN }
+                headers: { 'X-Admin-Token': ADMIN_TOKEN as string }
             });
             if (getRes.ok) {
                 const getData = await getRes.json();
@@ -395,7 +395,7 @@ const databases = {
             method: 'PUT',
             headers: { 
                 'Content-Type': 'application/json',
-                'X-Admin-Token': ADMIN_TOKEN
+                'X-Admin-Token': ADMIN_TOKEN as string
             },
             body: JSON.stringify(finalPayload)
         });
@@ -424,7 +424,7 @@ const databases = {
         
         const response = await fetch(url, {
             method: 'DELETE',
-            headers: { 'X-Admin-Token': ADMIN_TOKEN }
+            headers: { 'X-Admin-Token': ADMIN_TOKEN as string }
         });
         if (!response.ok) {
             const err: any = new Error(`Failed to delete document ${documentId}`);

@@ -1,7 +1,7 @@
 export default {
   async fetch(request, env) {
     const ORACLE_HOST = "https://gb0abb62e885e33-e57vm4usgodt141x.adb.eu-frankfurt-1.oraclecloudapps.com/ords/admin";
-    const ADMIN_TOKEN = "yarraksikici"; // MUST match the value in Cloudflare Pages Environment Variables
+    const ADMIN_TOKEN = env.ADMIN_TOKEN
 
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",

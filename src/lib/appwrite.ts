@@ -5,7 +5,7 @@ const client = new Client()
     .setProject("kafmap");
 
 const BASE_URL = "https://kafmapdb.runte.workers.dev";
-const ADMIN_TOKEN = "YOUR_SECRET_TOKEN"; // Replace with your actual token
+const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN;
 
 async function hashPassword(password: string) {
     if (typeof crypto !== 'undefined' && crypto.subtle) {

@@ -40,10 +40,12 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
         url.searchParams.set(key, value);
     });
 
-    // Determine if this is a sensitive endpoint requiring admin checks
-    const isSensitive = path.startsWith('users') || path.startsWith('user_accounts');
+    // --- REFINED SECURITY CHECK ---
+    // Only block the GLOBAL LIST fetch for non-admins. 
+    // Individual lookups (/users/ID) are allowed for session verification.
+    const isUserList = path === 'users' || path === 'users/' || path === 'user_accounts' || path === 'user_accounts/';
 
-    if (isSensitive) {
+    if (isUserList) {
         const authCookie = req.cookies.get('kafmap_auth')?.value;
         if (!authCookie) {
             return NextResponse.json({ error: 'Unauthorized: No session' }, { status: 401 });
@@ -52,7 +54,7 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
         try {
             const user = JSON.parse(decodeURIComponent(authCookie));
             if (user.role !== 'admin') {
-                return NextResponse.json({ error: 'Forbidden: Admin only' }, { status: 403 });
+                return NextResponse.json({ error: 'Forbidden: Admin access required for user list' }, { status: 403 });
             }
         } catch (e) {
             return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 });

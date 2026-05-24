@@ -5,6 +5,7 @@ const client = new Client()
     .setProject("kafmap");
 
 const BASE_URL = "https://kafmapdb.runte.workers.dev";
+const ADMIN_TOKEN = "kafmap_gizli_anahtar_2024";
 
 async function hashPassword(password: string) {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
@@ -146,8 +147,6 @@ const account = {
 };
 
 const mapCollectionToTable = (collectionId: string) => {
-    if (collectionId === 'users') return 'user_accounts';
-    if (collectionId === 'reviews') return 'reviews_list';
     return collectionId;
 };
 
@@ -276,7 +275,9 @@ const databases = {
         const table = mapCollectionToTable(collectionId);
         const url = `${BASE_URL}/${table}/`;
         
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            headers: { 'X-Admin-Token': ADMIN_TOKEN }
+        });
         if (!response.ok) throw new Error(`Failed to fetch from ${table}`);
         const data = await response.json();
         
@@ -320,14 +321,11 @@ const databases = {
     getDocument: async (databaseId: string, collectionId: string, documentId: string) => {
         const table = mapCollectionToTable(collectionId);
         const ordsId = table === 'places' && documentId.startsWith('place_') ? documentId.replace('place_', '') : documentId;
+        const url = `${BASE_URL}/${table}/${ordsId}`;
 
-        // Use custom path for user accounts
-        const url = table === 'user_accounts' 
-            ? `${BASE_URL}/${table}/id/${ordsId}`
-            : `${BASE_URL}/${table}/${ordsId}`;
-
-        const response = await fetch(url);
-        if (!response.ok) {
+        const response = await fetch(url, {
+            headers: { 'X-Admin-Token': ADMIN_TOKEN }
+        });        if (!response.ok) {
             const err: any = new Error(`Failed to fetch document ${documentId}`);
             err.code = response.status;
             throw err;
@@ -372,15 +370,13 @@ const databases = {
     updateDocument: async (databaseId: string, collectionId: string, documentId: string, data: any) => {
         const table = mapCollectionToTable(collectionId);
         const ordsId = table === 'places' && documentId.startsWith('place_') ? documentId.replace('place_', '') : documentId;
-        
-        // Use custom path for user updates
-        const url = table === 'user_accounts' 
-            ? `${BASE_URL}/${table}/id/${ordsId}`
-            : `${BASE_URL}/${table}/${ordsId}`;
+        const url = `${BASE_URL}/${table}/${ordsId}`;
 
         let mergedNormalized = { ...data };
         try {
-            const getRes = await fetch(url);
+            const getRes = await fetch(url, {
+                headers: { 'X-Admin-Token': ADMIN_TOKEN }
+            });
             if (getRes.ok) {
                 const getData = await getRes.json();
                 const rawDoc = Array.isArray(getData.items) ? getData.items[0] : getData;
@@ -397,7 +393,10 @@ const databases = {
         
         const response = await fetch(url, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-Admin-Token': ADMIN_TOKEN
+            },
             body: JSON.stringify(finalPayload)
         });
         if (!response.ok) {
@@ -424,7 +423,8 @@ const databases = {
         const url = `${BASE_URL}/${table}/${ordsId}`;
         
         const response = await fetch(url, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'X-Admin-Token': ADMIN_TOKEN }
         });
         if (!response.ok) {
             const err: any = new Error(`Failed to delete document ${documentId}`);

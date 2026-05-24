@@ -3,72 +3,107 @@ import { NextRequest, NextResponse } from 'next/server';
 export const runtime = 'edge';
 
 const WORKER_URL = "https://kafmapdb.runte.workers.dev";
+// Use ADMIN_TOKEN (Private) for server-side proxy
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
-async function handleProxy(req: NextRequest, { params }: { params: any }) {
-    const pathArray = await params.path || [];
-    const path = pathArray.join('/');
+export async function GET(req: NextRequest, segmentData: { params: Promise<{ path?: string[] }> }) {
+    return handleProxy(req, segmentData);
+}
+
+export async function POST(req: NextRequest, segmentData: { params: Promise<{ path?: string[] }> }) {
+    return handleProxy(req, segmentData);
+}
+
+export async function PUT(req: NextRequest, segmentData: { params: Promise<{ path?: string[] }> }) {
+    return handleProxy(req, segmentData);
+}
+
+export async function DELETE(req: NextRequest, segmentData: { params: Promise<{ path?: string[] }> }) {
+    return handleProxy(req, segmentData);
+}
+
+async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ path?: string[] }> }) {
+    const params = await segmentData.params;
+    const pathArray = params.path || [];
+    let path = pathArray.join('/');
+    
+    // Crucial: Restore trailing slash if the original request had one
+    // Oracle ORDS is very sensitive to trailing slashes
+    if (req.nextUrl.pathname.endsWith('/') && path && !path.endsWith('/')) {
+        path += '/';
+    }
+
     const url = new URL(`${WORKER_URL}/${path}`);
     
-    // Copy search params (queries like ?q=...)
+    // Copy all search params
     req.nextUrl.searchParams.forEach((value, key) => {
         url.searchParams.set(key, value);
     });
 
-    // Check if the endpoint is sensitive (users management)
+    // Determine if this is a sensitive endpoint requiring admin checks
     const isSensitive = path.startsWith('users') || path.startsWith('user_accounts');
 
     if (isSensitive) {
-        // --- SERVER-SIDE AUTH CHECK ---
-        // Verify user from cookie without trusting the client
         const authCookie = req.cookies.get('kafmap_auth')?.value;
         if (!authCookie) {
-            return NextResponse.json({ error: 'Unauthorized: No session found' }, { status: 401 });
+            return NextResponse.json({ error: 'Unauthorized: No session' }, { status: 401 });
         }
 
         try {
             const user = JSON.parse(decodeURIComponent(authCookie));
-            // Only allow admins to access these endpoints via proxy
             if (user.role !== 'admin') {
-                return NextResponse.json({ error: 'Forbidden: Admin access required' }, { status: 403 });
+                return NextResponse.json({ error: 'Forbidden: Admin only' }, { status: 403 });
             }
         } catch (e) {
             return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 });
         }
     }
 
-    // Forward the request to the worker with the hidden ADMIN_TOKEN
-    const headers = new Headers(req.headers);
-    headers.set('X-Admin-Token', ADMIN_TOKEN || '');
-    
-    // Remove host header to avoid SSL/Routing issues
-    headers.delete('host');
+    // Prepare headers for the Worker
+    const headers = new Headers();
+    // Copy essential headers from original request
+    const headersToCopy = ['content-type', 'accept', 'accept-language'];
+    headersToCopy.forEach(h => {
+        const val = req.headers.get(h);
+        if (val) headers.set(h, val);
+    });
+
+    // SECURELY inject the token on the server
+    if (ADMIN_TOKEN) {
+        headers.set('X-Admin-Token', ADMIN_TOKEN);
+    } else {
+        console.error("PROXY ERROR: ADMIN_TOKEN environment variable is missing!");
+    }
 
     try {
-        const proxyRes = await fetch(url.toString(), {
+        const fetchOptions: RequestInit = {
             method: req.method,
             headers: headers,
-            body: req.method !== 'GET' && req.method !== 'HEAD' ? await req.blob() : undefined,
             redirect: 'follow'
-        });
+        };
 
+        // Forward body for non-GET requests
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+            fetchOptions.body = await req.arrayBuffer();
+        }
+
+        const proxyRes = await fetch(url.toString(), fetchOptions);
         const data = await proxyRes.text();
         
+        const responseHeaders = new Headers();
+        responseHeaders.set('Content-Type', proxyRes.headers.get('Content-Type') || 'application/json');
+        // Add CORS for flexibility, though same-origin is preferred
+        responseHeaders.set('Access-Control-Allow-Origin', '*');
+
         return new Response(data, {
             status: proxyRes.status,
-            headers: {
-                'Content-Type': proxyRes.headers.get('Content-Type') || 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            }
+            headers: responseHeaders
         });
     } catch (error: any) {
-        console.error("Proxy error:", error);
-        return NextResponse.json({ error: 'Database Proxy Error', details: error.message }, { status: 500 });
+        console.error("Proxy failure:", error);
+        return NextResponse.json({ 
+            error: 'Database connection failed', 
+            details: error.message 
+        }, { status: 500 });
     }
 }
-
-export const GET = handleProxy;
-export const POST = handleProxy;
-export const PUT = handleProxy;
-export const DELETE = handleProxy;
-export const PATCH = handleProxy;

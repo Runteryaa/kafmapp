@@ -5,10 +5,10 @@ import { databases, ID } from '../../lib/appwrite';
 import { getTranslation } from '../../lib/translations';
 import { useAuth } from '../../context/AuthContext';
 import { 
-    Check, X, ShieldCheck, Lock, Loader2, MapPin, KeyRound, Wifi, 
+    Check, X, ShieldCheck, Loader2, MapPin, KeyRound, Wifi, 
     Link, Pencil, Trash2, Search, Plus, Coffee, Utensils, 
     Pizza, Beer, Star, ExternalLink, AlertCircle, RefreshCw, LayoutDashboard, Store, MessageSquare,
-    Ban, Trash
+    Ban
 } from 'lucide-react';
 import { Place, MenuItem } from '../../lib/types';
 import { User } from 'lucide-react';

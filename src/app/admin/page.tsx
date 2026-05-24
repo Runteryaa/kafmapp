@@ -16,7 +16,7 @@ import { User } from 'lucide-react';
 type Tab = 'submissions' | 'venues' | 'reviews' | 'users';
 
 export default function AdminPage() {
-    const { user, loading: authLoading } = useAuth();
+    const { user, logout, loading: authLoading } = useAuth();
     const [language, setLanguage] = useState<'tr' | 'en'>('tr');
     const t = getTranslation(language);
     const [activeTab, setActiveTab] = useState<Tab>('submissions');
@@ -428,37 +428,6 @@ export default function AdminPage() {
         }
     };
 
-    if (!isAuthenticated) {
-        return (
-            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-2xl w-full max-w-md animate-fade-in border border-gray-100 dark:border-gray-700">
-                    <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto mb-8 transform rotate-12 shadow-lg">
-                        <ShieldCheck size={40} />
-                    </div>
-                    <h1 className="text-3xl font-black text-center text-gray-900 dark:text-white mb-2">Admin Panel</h1>
-                    <p className="text-sm text-gray-500 text-center mb-8 font-medium">Please verify your identity to continue.</p>
-
-                    <form onSubmit={handleLogin} className="space-y-5">
-                        <div className="relative group">
-                            <Lock size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 group-focus-within:text-amber-500 transition-colors" />
-                            <input
-                                type="password"
-                                value={passwordInput}
-                                onChange={(e) => setPasswordInput(e.target.value)}
-                                placeholder="Master Password"
-                                className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 outline-none text-gray-900 dark:text-white transition-all font-bold"
-                                required
-                            />
-                        </div>
-                        <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-amber-500/20 active:scale-95">
-                            Enter Dashboard
-                        </button>
-                    </form>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0f172a] flex flex-col md:flex-row">
             {/* Sidebar */}
@@ -509,7 +478,7 @@ export default function AdminPage() {
                         </div>
                     )}
                     <button 
-                        onClick={() => setIsAuthenticated(false)}
+                        onClick={() => logout()}
                         className="flex items-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 transition-colors w-full px-2 py-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10"
                     >
                         <X size={18} /> Logout

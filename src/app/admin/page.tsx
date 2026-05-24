@@ -51,6 +51,31 @@ export default function AdminPage() {
         return nonSpam;
     }, [pendingUpdates, submissionSubTab]);
 
+    const filteredUsers = useMemo(() => {
+        if (!allUsers || !Array.isArray(allUsers)) return [];
+        return allUsers.filter(u => 
+            (u.name || "").toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+            (u.email || "").toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+            (u.$id || "").includes(userSearchQuery)
+        );
+    }, [allUsers, userSearchQuery]);
+
+    const filteredVenues = useMemo(() => {
+        return allVenues.filter(v => 
+            v.name.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
+            v.address.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
+            v.id.toString().includes(venueSearchQuery)
+        );
+    }, [allVenues, venueSearchQuery]);
+
+    const filteredReviews = useMemo(() => {
+        return allReviews.filter(r => 
+            r.userName.toLowerCase().includes(reviewSearchQuery.toLowerCase()) ||
+            (r.commentText || "").toLowerCase().includes(reviewSearchQuery.toLowerCase()) ||
+            r.placeId.toString().includes(reviewSearchQuery)
+        );
+    }, [allReviews, reviewSearchQuery]);
+
     const fetchAllData = async () => {
         setIsLoading(true);
         try {
@@ -177,14 +202,6 @@ export default function AdminPage() {
             setActionLoadingId(null);
         }
     };
-
-    const filteredUsers = useMemo(() => {
-        return allUsers.filter(u => 
-            (u.name || "").toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-            (u.email || "").toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-            u.$id.includes(userSearchQuery)
-        );
-    }, [allUsers, userSearchQuery]);
 
     const fetchVenues = async () => {
         try {
@@ -387,22 +404,6 @@ export default function AdminPage() {
             setActionLoadingId(null);
         }
     };
-
-    const filteredVenues = useMemo(() => {
-        return allVenues.filter(v => 
-            v.name.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
-            v.address.toLowerCase().includes(venueSearchQuery.toLowerCase()) ||
-            v.id.toString().includes(venueSearchQuery)
-        );
-    }, [allVenues, venueSearchQuery]);
-
-    const filteredReviews = useMemo(() => {
-        return allReviews.filter(r => 
-            r.userName.toLowerCase().includes(reviewSearchQuery.toLowerCase()) ||
-            (r.commentText || "").toLowerCase().includes(reviewSearchQuery.toLowerCase()) ||
-            r.placeId.toString().includes(reviewSearchQuery)
-        );
-    }, [allReviews, reviewSearchQuery]);
 
     const handleDeleteReviewByAdmin = async (review: any) => {
         if (!confirm(`Delete review by "${review.userName}"?`)) return;

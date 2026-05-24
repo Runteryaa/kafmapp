@@ -4,8 +4,7 @@ const client = new Client()
     .setEndpoint("https://fra.cloud.appwrite.io/v1")
     .setProject("kafmap");
 
-const BASE_URL = "https://kafmapdb.runte.workers.dev";
-const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN;
+const BASE_URL = "/api/db";
 
 async function hashPassword(password: string) {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
@@ -275,9 +274,7 @@ const databases = {
         const table = mapCollectionToTable(collectionId);
         const url = `${BASE_URL}/${table}/`;
         
-        const response = await fetch(url, {
-            headers: { 'X-Admin-Token': ADMIN_TOKEN as string }
-        });
+        const response = await fetch(url);
         if (!response.ok) throw new Error(`Failed to fetch from ${table}`);
         const data = await response.json();
         
@@ -323,9 +320,8 @@ const databases = {
         const ordsId = table === 'places' && documentId.startsWith('place_') ? documentId.replace('place_', '') : documentId;
         const url = `${BASE_URL}/${table}/${ordsId}`;
 
-        const response = await fetch(url, {
-            headers: { 'X-Admin-Token': ADMIN_TOKEN as string }
-        });        if (!response.ok) {
+        const response = await fetch(url);
+        if (!response.ok) {
             const err: any = new Error(`Failed to fetch document ${documentId}`);
             err.code = response.status;
             throw err;
@@ -374,9 +370,7 @@ const databases = {
 
         let mergedNormalized = { ...data };
         try {
-            const getRes = await fetch(url, {
-                headers: { 'X-Admin-Token': ADMIN_TOKEN as string }
-            });
+            const getRes = await fetch(url);
             if (getRes.ok) {
                 const getData = await getRes.json();
                 const rawDoc = Array.isArray(getData.items) ? getData.items[0] : getData;
@@ -394,8 +388,7 @@ const databases = {
         const response = await fetch(url, {
             method: 'PUT',
             headers: { 
-                'Content-Type': 'application/json',
-                'X-Admin-Token': ADMIN_TOKEN as string
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify(finalPayload)
         });
@@ -423,8 +416,7 @@ const databases = {
         const url = `${BASE_URL}/${table}/${ordsId}`;
         
         const response = await fetch(url, {
-            method: 'DELETE',
-            headers: { 'X-Admin-Token': ADMIN_TOKEN as string }
+            method: 'DELETE'
         });
         if (!response.ok) {
             const err: any = new Error(`Failed to delete document ${documentId}`);

@@ -1,7 +1,7 @@
 export default {
   async fetch(request, env) {
     const ORACLE_HOST = "https://gb0abb62e885e33-e57vm4usgodt141x.adb.eu-frankfurt-1.oraclecloudapps.com/ords/admin";
-    const ADMIN_TOKEN = "ananisikeyim"; // MUST match the value in src/lib/appwrite.ts
+    const ADMIN_TOKEN = "YOUR_SECRET_TOKEN"; // MUST match the value in src/lib/appwrite.ts
 
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",

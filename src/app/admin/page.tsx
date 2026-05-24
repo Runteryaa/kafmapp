@@ -16,11 +16,9 @@ import { User } from 'lucide-react';
 type Tab = 'submissions' | 'venues' | 'reviews' | 'users';
 
 export default function AdminPage() {
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [language, setLanguage] = useState<'tr' | 'en'>('tr');
     const t = getTranslation(language);
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [passwordInput, setPasswordInput] = useState("");
     const [activeTab, setActiveTab] = useState<Tab>('submissions');
     const [submissionSubTab, setSubmissionSubTab] = useState<'all' | 'reports' | 'additions' | 'updates' | 'spam'>('all');
     const [isLoading, setIsLoading] = useState(false);
@@ -53,19 +51,6 @@ export default function AdminPage() {
         return nonSpam;
     }, [pendingUpdates, submissionSubTab]);
 
-    // Simple hardcoded password for now.
-    const ADMIN_PASSWORD = "admin";
-
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (passwordInput === ADMIN_PASSWORD || passwordInput === "admin123") {
-            setIsAuthenticated(true);
-            fetchAllData();
-        } else {
-            alert("Incorrect password");
-        }
-    };
-
     const fetchAllData = async () => {
         setIsLoading(true);
         try {
@@ -81,6 +66,37 @@ export default function AdminPage() {
             setIsLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (!authLoading && user && (user as any).role === 'admin') {
+            fetchAllData();
+        }
+    }, [user, authLoading]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+                <Loader2 size={48} className="animate-spin text-amber-500" />
+            </div>
+        );
+    }
+
+    if (!user || (user as any).role !== 'admin') {
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center p-6 text-center">
+                <div className="w-24 h-24 bg-red-100 dark:bg-red-900/30 text-red-500 rounded-full flex items-center justify-center mb-6">
+                    <ShieldCheck size={48} />
+                </div>
+                <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-4">Access Denied</h1>
+                <p className="text-gray-500 dark:text-gray-400 font-medium mb-8 max-w-md">
+                    You do not have the required administrative privileges to view this page.
+                </p>
+                <a href="/" className="bg-amber-500 text-white font-black px-8 py-4 rounded-2xl shadow-xl shadow-amber-500/20 hover:scale-105 transition-transform active:scale-95">
+                    Return to Map
+                </a>
+            </div>
+        );
+    }
 
     const fetchPendingUpdates = async () => {
         try {

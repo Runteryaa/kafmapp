@@ -32,6 +32,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         checkUserStatus();
+
+        // Background Sync: Check permissions every 60 seconds
+        // This ensures roles/ban status update automatically without relogging
+        const interval = setInterval(() => {
+            if (typeof document !== 'undefined' && document.cookie.includes('kafmap_auth')) {
+                checkUserStatus();
+            }
+        }, 60000);
+
+        return () => clearInterval(interval);
     }, []);
 
     const login = async (email: string, password: string) => {

@@ -56,7 +56,7 @@ const account = {
             }
 
             // Verify with backend that the user still exists and isn't banned
-            const url = `${BASE_URL}/user_accounts/${userId}`;
+            const url = `${BASE_URL}/users/${userId}`;
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -99,11 +99,7 @@ const account = {
         }
         
         const user = await response.json();
-        
-        const normalizedUser = {
-            ...user,
-            $id: String(user.id || user.ID || Math.random())
-        };
+        const normalizedUser = normalizeDoc(user);
         
         setCookie('kafmap_auth', encodeURIComponent(JSON.stringify(normalizedUser)), 30); // 30 days
         return normalizedUser;
@@ -138,10 +134,12 @@ const account = {
         
         let createdUser: any = payload;
         try {
-            createdUser = await response.json();
+            const rawCreated = await response.json();
+            createdUser = normalizeDoc(rawCreated);
         } catch (e) {}
         
-        return { ...createdUser, $id: finalId };
+        if (!createdUser.$id) createdUser.$id = finalId;
+        return createdUser;
     }
 };
 

@@ -27,54 +27,55 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
     const pathArray = params.path || [];
     let path = pathArray.join('/');
     
-    // Crucial: Restore trailing slash if the original request had one
-    // Oracle ORDS is very sensitive to trailing slashes
+    // Crucial: Restore trailing slash for ORDS
     if (req.nextUrl.pathname.endsWith('/') && path && !path.endsWith('/')) {
         path += '/';
     }
 
     const url = new URL(`${WORKER_URL}/${path}`);
-    
-    // Copy all search params
-    req.nextUrl.searchParams.forEach((value, key) => {
-        url.searchParams.set(key, value);
-    });
+    req.nextUrl.searchParams.forEach((value, key) => url.searchParams.set(key, value));
+
+    // Get current user from cookie for internal auth checks
+    const authCookie = req.cookies.get('kafmap_auth')?.value;
+    let currentUser: any = null;
+    if (authCookie) {
+        try { currentUser = JSON.parse(decodeURIComponent(authCookie)); } catch (e) {}
+    }
 
     // --- REFINED SECURITY CHECK ---
-    // Only block the GLOBAL LIST fetch for non-admins. 
-    // Individual lookups (/users/ID) are allowed for session verification.
-    const isUserList = path === 'users' || path === 'users/' || path === 'user_accounts' || path === 'user_accounts/';
+    const isUserRelated = path === 'users' || path.startsWith('users/');
 
-    if (isUserList) {
-        const authCookie = req.cookies.get('kafmap_auth')?.value;
-        if (!authCookie) {
-            return NextResponse.json({ error: 'Unauthorized: No session' }, { status: 401 });
-        }
+    if (isUserRelated) {
+        const isListRequest = path === 'users' || path === 'users/';
+        const isAdmin = currentUser && currentUser.role === 'admin';
 
-        try {
-            const user = JSON.parse(decodeURIComponent(authCookie));
-            if (user.role !== 'admin') {
-                return NextResponse.json({ error: 'Forbidden: Admin access required for user list' }, { status: 403 });
+        if (req.method === 'GET') {
+            if (isListRequest) {
+                // Global list: Admin only
+                if (!isAdmin) return NextResponse.json({ error: 'Forbidden: Admin access required for user list' }, { status: 403 });
+            } else {
+                // Individual lookup (/users/ID): Allow if Admin OR self
+                const requestedId = pathArray[1];
+                const isSelf = currentUser && (currentUser.$id === requestedId || currentUser.id === requestedId);
+                
+                if (!isAdmin && !isSelf) {
+                    return NextResponse.json({ error: 'Forbidden: You can only verify your own session' }, { status: 403 });
+                }
             }
-        } catch (e) {
-            return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 });
+        } else {
+            // POST/PUT/DELETE on users: Strictly Admin only
+            if (!isAdmin) return NextResponse.json({ error: 'Forbidden: Admin access required for this action' }, { status: 403 });
         }
     }
 
-    // Prepare headers for the Worker
     const headers = new Headers();
-    // Copy essential headers from original request
-    const headersToCopy = ['content-type', 'accept', 'accept-language'];
-    headersToCopy.forEach(h => {
+    ['content-type', 'accept', 'accept-language'].forEach(h => {
         const val = req.headers.get(h);
         if (val) headers.set(h, val);
     });
 
-    // SECURELY inject the token on the server
     if (ADMIN_TOKEN) {
         headers.set('X-Admin-Token', ADMIN_TOKEN);
-    } else {
-        console.error("PROXY ERROR: ADMIN_TOKEN environment variable is missing!");
     }
 
     try {
@@ -84,28 +85,24 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
             redirect: 'follow'
         };
 
-        // Forward body for non-GET requests
-        if (req.method !== 'GET' && req.method !== 'HEAD') {
+        // Only read body for methods that typically have one and if content-length > 0
+        const hasBody = ['POST', 'PUT', 'PATCH'].includes(req.method);
+        if (hasBody) {
             fetchOptions.body = await req.arrayBuffer();
         }
 
         const proxyRes = await fetch(url.toString(), fetchOptions);
         const data = await proxyRes.text();
         
-        const responseHeaders = new Headers();
-        responseHeaders.set('Content-Type', proxyRes.headers.get('Content-Type') || 'application/json');
-        // Add CORS for flexibility, though same-origin is preferred
-        responseHeaders.set('Access-Control-Allow-Origin', '*');
-
         return new Response(data, {
             status: proxyRes.status,
-            headers: responseHeaders
+            headers: {
+                'Content-Type': proxyRes.headers.get('Content-Type') || 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            }
         });
     } catch (error: any) {
-        console.error("Proxy failure:", error);
-        return NextResponse.json({ 
-            error: 'Database connection failed', 
-            details: error.message 
-        }, { status: 500 });
+        console.error("Proxy Error:", error);
+        return NextResponse.json({ error: 'Internal Proxy Error' }, { status: 500 });
     }
 }

@@ -1501,7 +1501,10 @@ export default function Home() {
 
             {/* Burger Menu Button */}
             <button
-                onClick={() => setIsBurgerMenuOpen(!isBurgerMenuOpen)}
+                onClick={() => {
+                    setIsBurgerMenuOpen(!isBurgerMenuOpen);
+                    if (!isBurgerMenuOpen) checkUserStatus();
+                }}
                 className="fixed top-4 right-4 z-[2000] bg-white dark:bg-gray-800 p-2 rounded-full shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
                 {user ? (
@@ -1555,6 +1558,14 @@ export default function Home() {
                                     >
                                         <LogOut size={18} className="text-red-400" /> {t.logout}
                                     </button>
+                                    {(user as any).role === 'admin' && (
+                                        <a
+                                            href="/admin"
+                                            className="px-4 py-3 hover:bg-amber-50 dark:hover:bg-amber-900/20 flex items-center gap-3 text-sm font-medium text-amber-600 dark:text-amber-400 transition-colors w-full text-left border-t border-gray-100 dark:border-gray-700"
+                                        >
+                                            <ShieldCheck size={18} className="text-amber-500" /> Admin Panel
+                                        </a>
+                                    )}
                                 </>
                             )}
 

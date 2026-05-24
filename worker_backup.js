@@ -1,7 +1,7 @@
 export default {
   async fetch(request, env) {
     const ORACLE_HOST = "https://gb0abb62e885e33-e57vm4usgodt141x.adb.eu-frankfurt-1.oraclecloudapps.com/ords/admin";
-    const ADMIN_TOKEN = "YOUR_SECRET_TOKEN"; // MUST match the value in src/lib/appwrite.ts
+    const ADMIN_TOKEN = "yarraksikici"; // MUST match the value in Cloudflare Pages Environment Variables
 
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
@@ -13,18 +13,16 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    const url = new URL(request.url);
-
-    // SECURITY CHECK: Only allow access to user data with valid Token
-    if (url.pathname.startsWith('/users') || url.pathname.startsWith('/user_accounts')) {
-      const providedToken = request.headers.get('X-Admin-Token');
-      if (providedToken !== ADMIN_TOKEN) {
-        return new Response(JSON.stringify({ error: "Yetkisiz Erişim! Geçersiz Token." }), { 
-          status: 401, 
-          headers: { "Content-Type": "application/json", ...corsHeaders } 
-        });
-      }
+    // MANDATORY SECURITY CHECK: All requests must come via our secure proxy with the Token
+    const providedToken = request.headers.get('X-Admin-Token');
+    if (providedToken !== ADMIN_TOKEN) {
+      return new Response(JSON.stringify({ error: "Access Denied: Invalid or missing security token." }), { 
+        status: 401, 
+        headers: { "Content-Type": "application/json", ...corsHeaders } 
+      });
     }
+
+    const url = new URL(request.url);
 
     // 1. LOGIN API
     if (url.pathname === '/api/login' && request.method === 'POST') {
@@ -45,9 +43,9 @@ export default {
             createdat: user.createdat
           }), { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } });
         }
-        return new Response(JSON.stringify({ error: "E-posta veya şifre hatalı!" }), { status: 401, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "Invalid credentials!" }), { status: 401, headers: corsHeaders });
       } catch (e) {
-        return new Response(JSON.stringify({ error: "Sunucu hatası" }), { status: 500, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "Server Error" }), { status: 500, headers: corsHeaders });
       }
     }
 
@@ -55,27 +53,24 @@ export default {
     if (url.pathname === '/api/register' && request.method === 'POST') {
       try {
         const { email, password, name, id, createdat } = await request.json();
-        
         const insertRes = await fetch(`${ORACLE_HOST}/users/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id, email, password, name, createdat })
         });
 
-        if (!insertRes.ok) {
-           return new Response(JSON.stringify({ error: "Kayıt sırasında hata oluştu." }), { status: 500, headers: corsHeaders });
-        }
+        if (!insertRes.ok) return new Response(JSON.stringify({ error: "Registration failed." }), { status: 500, headers: corsHeaders });
 
         return new Response(JSON.stringify({ id, email, name, role: 'user', isbanned: 'false' }), {
           status: 201,
           headers: { "Content-Type": "application/json", ...corsHeaders }
         });
       } catch (e) {
-        return new Response(JSON.stringify({ error: "Sunucu hatası" }), { status: 500, headers: corsHeaders });
+        return new Response(JSON.stringify({ error: "Server Error" }), { status: 500, headers: corsHeaders });
       }
     }
 
-    // 3. GENERAL PROXY (Places, Reviews, Favorites, etc.)
+    // 3. GENERAL PROXY
     const targetUrl = ORACLE_HOST + url.pathname + url.search;
     const newRequest = new Request(targetUrl, {
       method: request.method,

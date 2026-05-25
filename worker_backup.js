@@ -85,7 +85,8 @@ export default {
         }
 
         const hashedPassword = await hashPassword(password);
-        const ordsRes = await fetch(`${ORACLE_HOST}/users/?q={"email":"${encodeURIComponent(email)}"}`);
+        const filter = JSON.stringify({ email });
+        const ordsRes = await fetch(`${ORACLE_HOST}/users/?q=${encodeURIComponent(filter)}`);
         const data = await ordsRes.json();
         
         const user = (data.items || []).find(u => u.email === email && u.password === hashedPassword);
@@ -134,7 +135,8 @@ export default {
           });
         }
 
-        const checkRes = await fetch(`${ORACLE_HOST}/users/?q={"email":"${encodeURIComponent(email)}"}`);
+        const filter = JSON.stringify({ email });
+        const checkRes = await fetch(`${ORACLE_HOST}/users/?q=${encodeURIComponent(filter)}`);
         const checkData = await checkRes.json();
         const existingUser = (checkData.items || []).find(u => u.email === email);
 

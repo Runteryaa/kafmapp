@@ -1,2 +1,0 @@
-- some palces has adress as city name or street name only. most of the places are still showing "adress unavailable" or etc. how can we fix that? fix that.
-- favori yerler ayni premium mekanlar gibi kendini belli edecek bir sekide gozukebilir.

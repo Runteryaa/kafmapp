@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { mockPlaces, LocationState, Place, Review } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
+import AccountSettingsModal from "../components/AccountSettingsModal";
 import { UpdateInfoModal } from "../components/UpdateInfoModal"; // Import new modal
 import ReportModal from "../components/ReportModal"; // Import report modal
 import { client, databases } from "../lib/appwrite"; // Import appwrite client
@@ -118,6 +119,7 @@ export default function Home() {
     const [isThemeLoaded, setIsThemeLoaded] = useState(false);
     const [isLoginOpen, setIsLoginOpen] = useState(false);
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+    const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
@@ -1871,6 +1873,27 @@ export default function Home() {
                                 </div>
                             </div>
                             
+                            {/* Account Settings */}
+                            {user && (
+                                <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                                    <button
+                                        onClick={() => {
+                                            setIsSettingsOpen(false);
+                                            setIsAccountSettingsModalOpen(true);
+                                        }}
+                                        className="w-full flex items-center justify-between p-3.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-gray-700 dark:text-gray-300"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-500 flex items-center justify-center">
+                                                <User size={16} />
+                                            </div>
+                                            <span className="text-sm font-bold">{t.accountSettings || 'Account Settings'}</span>
+                                        </div>
+                                        <Check size={16} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </button>
+                                </div>
+                            )}
+
                             {/* Reset Settings */}
                             <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
                                 <button
@@ -1923,6 +1946,14 @@ export default function Home() {
                 }}
                 t={t}
                 checkIsSpam={checkIsSpam}
+            />
+
+            {/* Account Settings Modal */}
+            <AccountSettingsModal
+                isOpen={isAccountSettingsModalOpen}
+                onClose={() => setIsAccountSettingsModalOpen(false)}
+                language={language}
+                showToast={showToast}
             />
 
             {/* Toast Notification */}

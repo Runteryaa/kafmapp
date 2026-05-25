@@ -1,11 +1,8 @@
-// Worker hafızasında IP'leri ve istek sayılarını tutacağımız yer (Sunucu bazlı çalışır)
 const rateLimitMap = new Map();
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const ORACLE_HOST = "https://gb0abb62e885e33-e57vm4usgodt141x.adb.eu-frankfurt-1.oraclecloudapps.com/ords/admin";
-    
-    // MUST match the value in Cloudflare Pages Environment Variables
     const ADMIN_TOKEN = env.ADMIN_TOKEN; 
 
     const corsHeaders = {
@@ -18,14 +15,12 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // --- RATE LIMITING (İSTEK SINIRLANDIRMA) ---
-    const clientIP = request.headers.get("CF-Connecting-IP");
+    const clientIP = request.headers.get("x-forwarded-for") || request.headers.get("CF-Connecting-IP");
     
     if (clientIP) {
       const now = Date.now();
       const ipData = rateLimitMap.get(clientIP) || { count: 0, firstRequestTime: now };
 
-      // Eğer ilk isteğin üzerinden 10 saniye (10000 ms) geçtiyse sayacı sıfırla
       if (now - ipData.firstRequestTime > 10000) {
         ipData.count = 1;
         ipData.firstRequestTime = now;
@@ -35,7 +30,6 @@ export default {
 
       rateLimitMap.set(clientIP, ipData);
 
-      // 10 saniye içinde 5'ten fazla istek atıldıysa engelle
       if (ipData.count > 5) {
         return new Response(JSON.stringify({ 
           error: "Too many requests. Please try again later." 
@@ -49,9 +43,7 @@ export default {
         });
       }
     }
-    // -------------------------------------------
 
-    // SECURITY: Token check for every request
     const providedToken = request.headers.get('X-Admin-Token');
     if (providedToken !== ADMIN_TOKEN) {
       return new Response(JSON.stringify({ error: "Access Denied: Invalid security token." }), { 
@@ -62,8 +54,6 @@ export default {
 
     const url = new URL(request.url);
 
-    // --- UTILITY FUNCTIONS ---
-    // Fix 2: Password Hashing (Web Crypto API SHA-256)
     const hashPassword = async (password) => {
       const encoder = new TextEncoder();
       const data = encoder.encode(password);
@@ -71,15 +61,12 @@ export default {
       return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
     };
 
-    // Fix 3: Input Validation
     const isValidEmail = (email) => {
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     };
 
-    // 1. LOGIN API
     if (url.pathname === '/v1/api/login' && request.method === 'POST') {
       try {
-        // Fix 4: Secure JSON Parsing
         let body;
         try {
           body = await request.json();
@@ -91,19 +78,16 @@ export default {
 
         const { email, password } = body;
 
-        // Fix 3: Input Validation Check
         if (!email || !isValidEmail(email) || !password || password.length < 6) {
           return new Response(JSON.stringify({ error: "Invalid email or password format" }), { 
             status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } 
           });
         }
 
-        // Hash the incoming password for comparison
         const hashedPassword = await hashPassword(password);
-        const ordsRes = await fetch(`${ORACLE_HOST}/users/?q={"email":"${email}"}`);
+        const ordsRes = await fetch(`${ORACLE_HOST}/users/?q={"email":"${encodeURIComponent(email)}"}`);
         const data = await ordsRes.json();
         
-        // Compare with hashedPassword
         const user = (data.items || []).find(u => u.email === email && u.password === hashedPassword);
 
         if (user) {
@@ -131,10 +115,8 @@ export default {
       }
     }
 
-    // 2. REGISTER API
     if (url.pathname === '/v1/api/register' && request.method === 'POST') {
       try {
-        // Fix 4: Secure JSON Parsing
         let body;
         try {
           body = await request.json();
@@ -144,17 +126,15 @@ export default {
           });
         }
 
-        const { id, email, password, name, createdat } = body;
+        const { email, password, name, createdat } = body;
 
-        // Fix 3: Input Validation Check
         if (!email || !isValidEmail(email) || !password || password.length < 6) {
           return new Response(JSON.stringify({ error: "Invalid email or password format. Password must be at least 6 characters." }), { 
             status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } 
           });
         }
 
-        // Check if user already exists
-        const checkRes = await fetch(`${ORACLE_HOST}/users/?q={"email":"${email}"}`);
+        const checkRes = await fetch(`${ORACLE_HOST}/users/?q={"email":"${encodeURIComponent(email)}"}`);
         const checkData = await checkRes.json();
         const existingUser = (checkData.items || []).find(u => u.email === email);
 
@@ -165,18 +145,18 @@ export default {
           });
         }
 
-        // Fix 2: Hash Password before saving
         const hashedPassword = await hashPassword(password);
+        const secureId = crypto.randomUUID();
 
         const insertRes = await fetch(`${ORACLE_HOST}/users/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            id: id,
+            id: secureId,
             email: email,
             password: hashedPassword,
-            name: name,
-            createdat: createdat
+            name: name || '',
+            createdat: createdat || new Date().toISOString()
           })
         });
 
@@ -185,12 +165,11 @@ export default {
           headers: { "Content-Type": "application/json", ...corsHeaders } 
         });
 
-        // Fix 1: Do not leak password in response
         return new Response(JSON.stringify({ 
-          id: id, 
+          id: secureId, 
           email: email, 
-          name: name,
-          createdat: createdat,
+          name: name || '',
+          createdat: createdat || new Date().toISOString(),
           role: 'user', 
           isbanned: 'false' 
         }), { 
@@ -205,12 +184,27 @@ export default {
       }
     }
 
-    // 3. GENERAL PROXY
     let proxyPath = url.pathname;
     if (proxyPath.startsWith('/v1/')) {
       proxyPath = proxyPath.substring(3);
     }
     const targetUrl = ORACLE_HOST + proxyPath + url.search;
+    
+    const cache = caches.default;
+    const cacheKey = new Request(targetUrl, request);
+
+    const isCacheable = request.method === 'GET' && proxyPath.includes('/places');
+
+    if (isCacheable) {
+      let cachedResponse = await cache.match(cacheKey);
+      if (cachedResponse) {
+        let response = new Response(cachedResponse.body, cachedResponse);
+        response.headers.set("Access-Control-Allow-Origin", "*");
+        response.headers.set("X-Cache", "HIT");
+        return response;
+      }
+    }
+
     const newRequest = new Request(targetUrl, {
       method: request.method,
       headers: request.headers,
@@ -222,10 +216,21 @@ export default {
     const responseHeaders = new Headers(response.headers);
     responseHeaders.set("Access-Control-Allow-Origin", "*");
     
-    return new Response(response.body, {
+    let finalResponse = new Response(response.body, {
       status: response.status,
       statusText: response.statusText,
       headers: responseHeaders
     });
+
+    if (isCacheable && finalResponse.status === 200) {
+      finalResponse.headers.set("X-Cache", "MISS");
+      finalResponse.headers.set("Cache-Control", "public, max-age=300");
+      ctx.waitUntil(cache.put(cacheKey, finalResponse.clone()));
+    } else {
+      finalResponse.headers.set("X-Cache", "BYPASS");
+      finalResponse.headers.set("Cache-Control", "no-cache");
+    }
+
+    return finalResponse;
   },
 };

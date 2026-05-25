@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { account } from '../lib/appwrite';
+import { account, databases } from '../lib/appwrite';
 import { ID, Models } from 'appwrite';
 
 interface AuthContextType {
@@ -11,6 +11,8 @@ interface AuthContextType {
     logout: () => Promise<void>;
     register: (email: string, password: string, name?: string) => Promise<void>;
     checkUserStatus: () => Promise<void>;
+    updateAccount: (data: any) => Promise<void>;
+    deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -59,8 +61,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await login(email, password);
     };
 
+    const updateAccount = async (data: any) => {
+        if (!user || !user.$id) throw new Error("No user logged in");
+        // Convert to backend format
+        const payload: any = {};
+        if (data.name) payload.name = data.name;
+        if (data.password) payload.password = data.password; // Note: Next.js proxy should ideally hash this, but we'll send it as is and hash it in worker. Ah wait, worker only handles POST /api/register. We need a way to hash the password on update. Let's handle password update in the backend or frontend. Appwrite.ts has hashPassword. We should export it or move it to a shared place. Actually, appwrite.ts has `databases.updateDocument`. We can hash the password in the component before calling updateAccount.
+
+        await databases.updateDocument('kafmap', 'users', user.$id, data);
+        await checkUserStatus(); // Refresh session data
+    };
+
+    const deleteAccount = async () => {
+        if (!user || !user.$id) throw new Error("No user logged in");
+        await databases.deleteDocument('kafmap', 'users', user.$id);
+        await logout();
+    };
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, register, checkUserStatus }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, register, checkUserStatus, updateAccount, deleteAccount }}>
             {children}
         </AuthContext.Provider>
     );

@@ -6,7 +6,7 @@ const client = new Client()
 
 const BASE_URL = "/api/db/v1";
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
         const encoder = new TextEncoder();
         const data = encoder.encode(password);
@@ -84,13 +84,12 @@ const account = {
         }
     },
     createEmailPasswordSession: async (email: string, password: string) => {
-        const hashedPassword = await hashPassword(password);
         const url = `${BASE_URL}/api/login`;
         
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password: hashedPassword })
+            body: JSON.stringify({ email, password })
         });
         
         if (!response.ok) {
@@ -109,14 +108,13 @@ const account = {
         return { success: true };
     },
     create: async (userId: string, email: string, password: string, name?: string) => {
-        const hashedPassword = await hashPassword(password);
         const url = `${BASE_URL}/api/register`;
         
         const finalId = userId === 'unique()' ? Math.random().toString(36).substring(2, 15) : userId;
         const payload = {
             id: finalId,
             email: email,
-            password: hashedPassword,
+            password: password,
             name: name || '',
             createdat: new Date().toISOString()
         };

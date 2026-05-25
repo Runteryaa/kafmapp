@@ -55,23 +55,18 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
         const isListRequest = checkPath === 'users' || checkPath === 'users/';
         const isAdmin = currentUser && currentUser.role === 'admin';
 
-        if (req.method === 'GET') {
-            if (isListRequest) {
-                // Global list: Admin only
-                if (!isAdmin) return NextResponse.json({ error: 'Forbidden: Admin access required for user list' }, { status: 403 });
-            } else {
-                // Individual lookup (/users/ID): Allow if Admin OR self
-                const pathParts = checkPath.split('/');
-                const requestedId = pathParts[1];
-                const isSelf = currentUser && (currentUser.$id === requestedId || currentUser.id === requestedId);
-                
-                if (!isAdmin && !isSelf) {
-                    return NextResponse.json({ error: 'Forbidden: You can only verify your own session' }, { status: 403 });
-                }
-            }
+        if (isListRequest) {
+            // Global list (GET or POST): Admin only. (POST /users/ is for registration but that goes through Worker /api/register)
+            if (!isAdmin && req.method !== 'POST') return NextResponse.json({ error: 'Forbidden: Admin access required for user list' }, { status: 403 });
         } else {
-            // POST/PUT/DELETE on users: Strictly Admin only
-            if (!isAdmin) return NextResponse.json({ error: 'Forbidden: Admin access required for this action' }, { status: 403 });
+            // Individual lookup/modify (/users/ID): Allow if Admin OR self
+            const pathParts = checkPath.split('/');
+            const requestedId = pathParts[1];
+            const isSelf = currentUser && (currentUser.$id === requestedId || currentUser.id === requestedId);
+            
+            if (!isAdmin && !isSelf) {
+                return NextResponse.json({ error: 'Forbidden: You can only access or modify your own session' }, { status: 403 });
+            }
         }
     }
 

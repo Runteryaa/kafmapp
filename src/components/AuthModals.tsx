@@ -154,7 +154,12 @@ export function RegisterModal({ isOpen, onClose, onSwitchToLogin, t }: { isOpen:
             await register(email, password, name);
             onClose(); // Close modal on success instead of reload
         } catch (err: unknown) {
-            setError((err as Error).message || t.failedToCreateAccount);
+            const errorMessage = (err as Error).message;
+            if (errorMessage === "Email already exists") {
+                setError(t.emailAlreadyExists || errorMessage);
+            } else {
+                setError(errorMessage || t.failedToCreateAccount);
+            }
         } finally {
             setIsLoading(false);
         }

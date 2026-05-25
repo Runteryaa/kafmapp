@@ -1,14 +1,12 @@
 import { Sponsor } from "./types";
 
-// Aktif sponsorluk anlaşmalarını buradan yönetebilirsin.
-// Yeni bir sponsor geldiğinde bu listeye ekleyip isActive: true yapman yeterli.
 export const activeSponsors: Sponsor[] = [
     {
-        id: "referrun-sponsor",
-        title: "referRun",
-        description: "En popüler uygulamaların güncel referans kodlarını keşfedin! Arkadaşlarınızı davet edin ve birlikte kazanmaya başlayın. referRun ile fırsatları kaçırmayın.",
-        linkUrl: "https://referrun.runte.workers.dev",
-        isActive: false,
+        id: "sponsorme",
+        title: "Sponsor Olun!",
+        description: "Kaf'Mapin sponsorluklar dışında bir geliri yoktur. Eğer bir işletme sahibiyseniz kendi mekanınızı öne çıkarmak için Premium alabilirsiniz. Eğer kullanıcıysanız bağış yapabilirsiniz. Şimiden teşekkürler",
+        linkUrl: "https://buymeacoffee.com/runterya",
+        isActive: true,
         position: "bottom"
     }
 ];

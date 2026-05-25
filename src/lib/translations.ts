@@ -194,6 +194,12 @@ export const t = {
         saveChanges: 'Save Changes',
         profile: 'Profile',
         name: 'Name',
+        resetSettings: 'Reset All Data',
+        loginToUnlockExtra: 'Login to sync your data across devices',
+        privacyPolicyTitle: 'Privacy Policy & KVKK',
+        licenseTitle: 'License Information',
+        kvkkContent: 'KafMap ("We") values the privacy of our users. This text has been prepared to fulfill our legal obligation in accordance with the Law on the Protection of Personal Data (KVKK). We only collect minimal necessary data (Email, Name) to provide account services. Your location data is processed locally in your browser and not stored on our servers unless you explicitly submit a report or update.',
+        licenseContent: 'GNU Affero General Public License v3.0 (AGPL-3.0)\n\nThis software is open source and licensed under the AGPLv3. You can access the full legal text at the link below:\n\nhttps://github.com/Runteryaa/kafmapp/blob/main/LICENSE',
     },
     tr: {
         searchPlaceholder: 'Kafe veya restoran ara...',
@@ -359,7 +365,7 @@ export const t = {
         localBoycott: 'Yerel Boykot',
         israelBoycottDesc: 'Uluslararası büyük zincirleri gizler',
         localBoycottDesc: 'Mado, Espressolab vb. yerleri gizler',
-        resetCustomizations: 'Bütün Kişiselleştirmeleri Sıfırla',
+        resetCustomizations: 'Kişiselleştirmeleri Sıfırla',
         resetConfirm: 'Bütün kişiselleştirmeleri sıfırlamak istediğinize emin misiniz?',
         customizationsReset: 'Kişiselleştirmeler başarıyla sıfırlandı',
         premiumDisclaimer: 'Bu bir sponsorlu/premium işletmedir.',
@@ -387,6 +393,12 @@ export const t = {
         saveChanges: 'Değişiklikleri Kaydet',
         profile: 'Profil',
         name: 'İsim',
+        resetSettings: 'Kişiselleştirmeleri Sıfırla',
+        loginToUnlockExtra: 'Verilerinizi cihazlar arası senkronize etmek için giriş yapın',
+        privacyPolicyTitle: 'Gizlilik Politikası ve KVKK',
+        licenseTitle: 'Lisans Bilgileri',
+        kvkkContent: 'KafMap ("Biz"), kullanıcılarımızın gizliliğine önem veriyoruz. Bu metin, 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) uyarınca aydınlatma yükümlülüğümüzü yerine getirmek amacıyla hazırlanmıştır. Sadece hesap hizmetlerini sağlamak için gerekli olan minimum veriyi (E-posta, İsim) topluyoruz. Konum verileriniz tarayıcınızda yerel olarak işlenir ve siz açıkça bir mekan raporu veya güncelleme göndermediğiniz sürece sunucularımızda saklanmaz.',
+        licenseContent: 'GNU Affero Genel Kamu Lisansı v3.0 (AGPLv3)\n\nBu program özgür bir yazılımdır: Özgür Yazılım Vakfı tarafından yayınlanan GNU Affero Genel Kamu Lisansı’nın 3. sürümü veya (isteğinize bağlı olarak) daha sonraki herhangi bir sürümü altındaki koşullara bağlı kalarak bu yazılımı yeniden dağıtabilir ve/veya değiştirebilirsiniz.\n\nBu yazılım faydalı olması umuduyla dağıtılmaktadır, ancak yazılımın HİÇBİR GARANTİSİ YOKTUR. Daha fazla bilgi için GNU Affero Genel Kamu Lisansı’nı inceleyin.',
     }
 };
 

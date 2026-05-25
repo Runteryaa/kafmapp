@@ -123,6 +123,7 @@ export default function Home() {
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
     const [updateModalSection, setUpdateModalSection] = useState<'toilet' | 'wifi' | 'menu' | null>('toilet');
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [legalView, setLegalView] = useState<'none' | 'kvkk' | 'license'>('none');
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
     const [placeReports, setPlaceReports] = useState<any[]>([]);
     const [placeUpdates, setPlaceUpdates] = useState<any[]>([]);
@@ -626,6 +627,19 @@ export default function Home() {
         setIsThemeLoaded(true);
     }, []);
 
+    // Prevents background scroll when any modal is open (Fixes mobile double-scroll)
+    useEffect(() => {
+        const isAnyModalOpen = isLoginOpen || isRegisterOpen || isSettingsOpen || isAccountSettingsModalOpen || isUpdateModalOpen || isReportModalOpen || isAddModalOpen;
+        if (isAnyModalOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isLoginOpen, isRegisterOpen, isSettingsOpen, isAccountSettingsModalOpen, isUpdateModalOpen, isReportModalOpen, isAddModalOpen]);
+
     // Save theme to local storage
     useEffect(() => {
         if (isThemeLoaded) {
@@ -664,13 +678,15 @@ export default function Home() {
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    // Auto-locate user on initial load
+    const locationWatchId = useRef<number | null>(null);
+
+    // Auto-locate user and watch for movement
     useEffect(() => {
         const fallbackToIpLocation = async (isManual = false) => {
             try {
-                const res = await fetch('https://ipapi.co/json/');
+                const res = await fetch('https://ipwho.is/');
                 const data = await res.json();
-                if (data && data.latitude && data.longitude) {
+                if (data && data.success && data.latitude && data.longitude) {
                     const newLocation = { lat: data.latitude, lng: data.longitude };
                     setUserLocation(newLocation);
                     setFlyToLocation(newLocation);
@@ -692,21 +708,54 @@ export default function Home() {
         }
 
         setIsLocating(true);
-        navigator.geolocation.getCurrentPosition(
+        
+        // Use watchPosition for real-time movement tracking
+        locationWatchId.current = navigator.geolocation.watchPosition(
             (position) => {
                 const newLocation = {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
-                setUserLocation(newLocation);
-                setFlyToLocation(newLocation);
+                
+                // Track previous location to avoid jumping
+                setUserLocation(prev => {
+                    // Update user location state
+                    return newLocation;
+                });
+
+                // Set flyTo only on the very first fix if we haven't done it yet
+                // Use a local variable check because state update is async
+                const isFirstFix = document.body.getAttribute('data-initial-panned') !== 'true';
+                if (isFirstFix) {
+                    setFlyToLocation(newLocation);
+                    document.body.setAttribute('data-initial-panned', 'true');
+                }
+                
                 setIsLocating(false);
             },
             (error) => {
-                console.warn("Auto-location failed on load:", error);
-                fallbackToIpLocation();
+                if (error.code !== 1) { // 1 = Permission Denied
+                    console.warn("Location tracking error:", error);
+                }
+                
+                const hasNoLocationYet = document.body.getAttribute('data-initial-panned') !== 'true';
+                if (hasNoLocationYet) {
+                    fallbackToIpLocation();
+                }
+                setIsLocating(false);
+            },
+            {
+                enableHighAccuracy: true,
+                maximumAge: 10000,
+                timeout: 5000
             }
         );
+
+        return () => {
+            if (locationWatchId.current !== null) {
+                navigator.geolocation.clearWatch(locationWatchId.current);
+            }
+        };
     }, []);
 
     const fetchReviews = async (placeId: string) => {
@@ -1448,6 +1497,14 @@ export default function Home() {
             }
         };
 
+        // If we already have a reasonably fresh location from watchPosition, use it immediately
+        if (userLocation) {
+            setFlyToLocation(userLocation);
+            setSelectedId(null);
+            showToast(t.locationUpdated);
+            return;
+        }
+
         if (!navigator.geolocation) {
             setIsLocating(true);
             fallbackToIpLocation();
@@ -1472,7 +1529,8 @@ export default function Home() {
                     console.warn("Manual location failed:", error);
                 }
                 fallbackToIpLocation();
-            }
+            },
+            { enableHighAccuracy: true, timeout: 5000 }
         );
     };
 
@@ -1750,154 +1808,196 @@ export default function Home() {
 
             {/* Settings Modal */}
             {isSettingsOpen && (
-                <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
-                    <div
-                        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-                        onClick={() => setIsSettingsOpen(false)}
-                    />
-                    <div className="relative bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-fade-in">
+                <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 sm:p-6 bg-gray-900/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col my-auto max-h-[90vh]">
+                        
+                        {/* Header - Simplified */}
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                            <h3 className="font-bold text-lg text-gray-900 dark:text-white">{t.settings}</h3>
+                            <h3 className="font-black text-lg text-gray-900 dark:text-white tracking-tight">{t.settings}</h3>
                             <button
                                 onClick={() => setIsSettingsOpen(false)}
-                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                             >
                                 <X size={20} />
                             </button>
                         </div>
-                        <div className="p-6 space-y-6">
-                            {/* Install App Setting */}
-                            {isInstallable && (
-                                <div className="animate-fade-in">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                        <MonitorSmartphone size={16} /> {t.installApp}
-                                    </label>
-                                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/50 rounded-xl p-4 flex items-center justify-between">
-                                        <div className="pr-4">
-                                            <p className="text-sm font-bold text-amber-900 dark:text-amber-400">{t.installApp}</p>
-                                            <p className="text-xs text-amber-700/80 dark:text-amber-500/80 mt-0.5">{t.installAppDesc}</p>
-                                        </div>
-                                        <button
-                                            onClick={handleInstallClick}
-                                            className="shrink-0 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-lg transition-colors shadow-sm shadow-amber-500/20"
-                                        >
-                                            {t.install}
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
 
-                            {/* Theme Setting */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                    <Sun size={16} /> {t.appearance}
-                                </label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => setTheme('light')}
-                                        className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-sm font-medium transition-all ${theme === 'light' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
-                                    >
-                                        <Sun size={16} /> {t.light}
-                                    </button>
-                                    <button
-                                        onClick={() => setTheme('dark')}
-                                        className={`flex items-center justify-center gap-2 py-2 px-4 rounded-lg border text-sm font-medium transition-all ${theme === 'dark' ? 'bg-gray-800 border-gray-700 text-white ring-1 ring-gray-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
-                                    >
-                                        <Moon size={16} /> {t.dark}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Boycott Settings */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                    <Shield size={16} /> {t.boycottSettings || "Boycott Filters"}
-                                </label>
-                                <div className="space-y-3">
-                                    <button
-                                        onClick={() => {
-                                            const newVal = !isIsraelBoycottEnabled;
-                                            setIsIsraelBoycottEnabled(newVal);
-                                            localStorage.setItem('israelBoycott', newVal.toString());
-                                        }}
-                                        className={`w-full flex items-center justify-between p-3.5 rounded-xl border transition-all ${isIsraelBoycottEnabled ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800'}`}
-                                    >
-                                        <div className="flex flex-col items-start gap-0.5">
-                                            <span className={`text-sm font-bold ${isIsraelBoycottEnabled ? 'text-red-700 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                {t.israelBoycott || "Israel Boycott"}
-                                            </span>
-                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">Hides major international chains</span>
-                                        </div>
-                                        <div className={`w-10 h-6 rounded-full relative transition-colors ${isIsraelBoycottEnabled ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-700'}`}>
-                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isIsraelBoycottEnabled ? 'left-5' : 'left-1'}`} />
-                                        </div>
-                                    </button>
-
-                                    <button
-                                        onClick={() => {
-                                            const newVal = !isLocalBoycottEnabled;
-                                            setIsLocalBoycottEnabled(newVal);
-                                            localStorage.setItem('localBoycott', newVal.toString());
-                                        }}
-                                        className={`w-full flex items-center justify-between p-3.5 rounded-xl border transition-all ${isLocalBoycottEnabled ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800' : 'bg-gray-50 dark:bg-gray-900 border-gray-100 dark:border-gray-800'}`}
-                                    >
-                                        <div className="flex flex-col items-start gap-0.5">
-                                            <span className={`text-sm font-bold ${isLocalBoycottEnabled ? 'text-orange-700 dark:text-orange-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                {t.localBoycott}
-                                            </span>
-                                            <span className="text-[10px] text-gray-400 dark:text-gray-500 font-medium">{t.localBoycottDesc}</span>
-                                        </div>
-                                        <div className={`w-10 h-6 rounded-full relative transition-colors ${isLocalBoycottEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-700'}`}>
-                                            <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isLocalBoycottEnabled ? 'left-5' : 'left-1'}`} />
-                                        </div>
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Language Setting */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-                                    <Languages size={16} /> {t.language}
-                                </label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <button
-                                        onClick={() => setLanguage('tr')}
-                                        className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'tr' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500'}`}
-                                    >
-                                        {t.turkish}
-                                    </button>
-                                    <button
-                                        onClick={() => setLanguage('en')}
-                                        className={`py-2 px-4 rounded-lg border text-sm font-medium transition-all ${language === 'en' ? 'bg-amber-50 border-amber-200 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700' : 'bg-white dark:bg-gray-700 er:border-gray-500'}`}
-                                    >
-                                        {t.english}
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            {/* Account Settings */}
-                            {user && (
-                                <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
-                                    <button
-                                        onClick={() => {
-                                            setIsSettingsOpen(false);
-                                            setIsAccountSettingsModalOpen(true);
-                                        }}
-                                        className="w-full flex items-center justify-between p-3.5 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all text-gray-700 dark:text-gray-300"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-500 flex items-center justify-center">
-                                                <User size={16} />
+                        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 no-scrollbar">
+                            {legalView === 'none' ? (
+                                <>
+                                    {/* Install App Section */}
+                                    {isInstallable && (
+                                        <section className="animate-fade-in">
+                                            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 rounded-xl p-4 flex items-center justify-between gap-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-800/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                                                        <MonitorSmartphone size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-black text-blue-900 dark:text-blue-400">{t.installApp}</p>
+                                                        <p className="text-[11px] text-blue-700/70 dark:text-blue-500/70 font-medium">{t.installAppDesc}</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={handleInstallClick}
+                                                    className="shrink-0 px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-lg transition-all active:scale-95"
+                                                >
+                                                    {t.install}
+                                                </button>
                                             </div>
-                                            <span className="text-sm font-bold">{t.accountSettings || 'Account Settings'}</span>
+                                        </section>
+                                    )}
+
+                                    {/* Personalization Section */}
+                                    <section>
+                                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                            <Sun size={12} /> {t.appearance || "Personalization"}
+                                        </h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="space-y-3 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+                                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.appearance}</label>
+                                                <div className="flex bg-white dark:bg-gray-900 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                                                    <button onClick={() => setTheme('light')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-black transition-all ${theme === 'light' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
+                                                        <Sun size={14} /> {t.light}
+                                                    </button>
+                                                    <button onClick={() => setTheme('dark')} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs font-black transition-all ${theme === 'dark' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
+                                                        <Moon size={14} /> {t.dark}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-3 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+                                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t.language}</label>
+                                                <div className="flex bg-white dark:bg-gray-900 p-1 rounded-lg border border-gray-200 dark:border-gray-700">
+                                                    <button onClick={() => setLanguage('tr')} className={`flex-1 py-2 rounded-md text-xs font-black transition-all ${language === 'tr' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
+                                                        {t.turkish}
+                                                    </button>
+                                                    <button onClick={() => setLanguage('en')} className={`flex-1 py-2 rounded-md text-xs font-black transition-all ${language === 'en' ? 'bg-amber-500 text-white shadow-md' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
+                                                        {t.english}
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <Check size={16} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </section>
+
+                                    {/* Privacy & Ethics Section */}
+                                    <section>
+                                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                            <Shield size={12} /> {t.boycottSettings || "Privacy & Filters"}
+                                        </h4>
+                                        <div className="space-y-3">
+                                            <button
+                                                onClick={() => {
+                                                    const newVal = !isIsraelBoycottEnabled;
+                                                    setIsIsraelBoycottEnabled(newVal);
+                                                    localStorage.setItem('israelBoycott', newVal.toString());
+                                                }}
+                                                className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${isIsraelBoycottEnabled ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-800/40 border-gray-100 dark:border-gray-800'}`}
+                                            >
+                                                <div className="flex flex-col items-start gap-0.5">
+                                                    <span className={`text-sm font-black ${isIsraelBoycottEnabled ? 'text-red-700 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                        {t.israelBoycott || "Israel Boycott"}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-500 font-medium">Hides major international chains</span>
+                                                </div>
+                                                <div className={`w-10 h-5 rounded-full relative transition-colors ${isIsraelBoycottEnabled ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-700'}`}>
+                                                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isIsraelBoycottEnabled ? 'left-6' : 'left-1'}`} />
+                                                </div>
+                                            </button>
+
+                                            <button
+                                                onClick={() => {
+                                                    const newVal = !isLocalBoycottEnabled;
+                                                    setIsLocalBoycottEnabled(newVal);
+                                                    localStorage.setItem('localBoycott', newVal.toString());
+                                                }}
+                                                className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${isLocalBoycottEnabled ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800' : 'bg-gray-50 dark:bg-gray-800/40 border-gray-100 dark:border-gray-800'}`}
+                                            >
+                                                <div className="flex flex-col items-start gap-0.5">
+                                                    <span className={`text-sm font-black ${isLocalBoycottEnabled ? 'text-orange-700 dark:text-orange-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                        {t.localBoycott}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-500 font-medium">{t.localBoycottDesc}</span>
+                                                </div>
+                                                <div className={`w-10 h-5 rounded-full relative transition-colors ${isLocalBoycottEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-700'}`}>
+                                                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isLocalBoycottEnabled ? 'left-6' : 'left-1'}`} />
+                                                </div>
+                                            </button>
+                                        </div>
+                                    </section>
+
+                                    {/* Account Section */}
+                                    <section>
+                                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                            <User size={12} /> {t.accountSettings || "Account"}
+                                        </h4>
+                                        {user ? (
+                                            <div className="bg-gray-50 dark:bg-gray-800/40 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                                <div className="flex items-center gap-4 w-full">
+                                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-lg">
+                                                        <User size={24} />
+                                                    </div>
+                                                    <div className="flex-1 truncate">
+                                                        <p className="text-sm font-black text-gray-900 dark:text-white truncate">{(user as any).name || (user as any).email}</p>
+                                                        <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{(user as any).role || 'Explorer'}</p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => {
+                                                        setIsSettingsOpen(false);
+                                                        setIsAccountSettingsModalOpen(true);
+                                                    }}
+                                                    className="w-full sm:w-auto px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-black rounded-lg hover:scale-105 active:scale-95 transition-all shadow-lg"
+                                                >
+                                                    {t.manage || "Manage"}
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="bg-amber-50 dark:bg-amber-900/10 rounded-xl p-5 border border-amber-100 dark:border-amber-900/30 text-center">
+                                                <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-3">{t.loginToUnlockExtra || "Login to sync your data"}</p>
+                                                <button 
+                                                    onClick={() => {
+                                                        setIsSettingsOpen(false);
+                                                        setIsLoginOpen(true);
+                                                    }}
+                                                    className="px-8 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-lg shadow-lg shadow-amber-500/20 transition-all"
+                                                >
+                                                    {t.signIn}
+                                                </button>
+                                            </div>
+                                        )}
+                                    </section>
+                                </>
+                            ) : (
+                                <div className="animate-fade-in space-y-4">
+                                    <div className="bg-gray-50 dark:bg-gray-800/40 p-6 rounded-xl border border-gray-100 dark:border-gray-800">
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap font-medium">
+                                            {legalView === 'kvkk' ? t.kvkkContent : t.licenseContent}
+                                        </p>
+                                    </div>
+                                    <button 
+                                        onClick={() => setLegalView('none')}
+                                        className="w-full py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-black rounded-xl text-xs transition-all active:scale-95"
+                                    >
+                                        {t.done}
                                     </button>
                                 </div>
                             )}
+                        </div>
 
-                            {/* Reset Settings */}
-                            <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
+                        {/* Footer Section - Space Efficient */}
+                        <div className="px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30 flex flex-col gap-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">KafMap v1.0</span>
+                                <div className="flex items-center gap-3">
+                                    <button onClick={() => setLegalView('kvkk')} className="text-[10px] font-black text-gray-500 hover:text-amber-600 dark:text-gray-400 dark:hover:text-amber-500 transition-colors uppercase tracking-tight">{t.privacyPolicyTitle || "Privacy & KVKK"}</button>
+                                    <span className="w-1 h-1 rounded-full bg-gray-300 dark:bg-gray-700" />
+                                    <button onClick={() => setLegalView('license')} className="text-[10px] font-black text-gray-500 hover:text-amber-600 dark:text-gray-400 dark:hover:text-amber-500 transition-colors uppercase tracking-tight">License</button>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                                <p className="text-[9px] text-gray-400 font-medium leading-tight max-w-[70%]">
+                                    {t.legalDisclaimer}
+                                </p>
                                 <button
                                     onClick={() => {
                                         if (confirm(t.resetConfirm || "Are you sure you want to reset all customizations?")) {
@@ -1907,31 +2007,21 @@ export default function Home() {
                                             localStorage.removeItem('localBoycott');
                                             localStorage.removeItem('filterType');
                                             localStorage.removeItem('sortType');
-                                            
-                                            // Reset local state
                                             setTheme('light');
                                             setLanguage('tr');
                                             setIsIsraelBoycottEnabled(false);
                                             setIsLocalBoycottEnabled(false);
                                             setFilterType('all');
                                             setSortType('rating');
-                                            
                                             showToast(t.customizationsReset || "Customizations reset successfully");
+                                            setIsSettingsOpen(false);
                                         }
                                     }}
-                                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/20 transition-all"
+                                    className="text-[10px] font-black text-red-500/60 hover:text-red-600 transition-all flex items-center gap-1 shrink-0"
                                 >
-                                    <RefreshCw size={16} /> {t.resetCustomizations || "Reset Customizations"}
+                                    <RefreshCw size={12} /> {t.resetSettings}
                                 </button>
                             </div>
-                        </div>
-                        <div className="bg-gray-50 dark:bg-gray-900/50 px-6 py-4 flex justify-end">
-                            <button
-                                onClick={() => setIsSettingsOpen(false)}
-                                className="bg-gray-900 dark:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hove900 dark:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors shadow-sm"
-                            >
-                                {t.done}
-                            </button>
                         </div>
                     </div>
                 </div>

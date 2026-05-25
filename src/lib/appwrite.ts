@@ -4,7 +4,7 @@ const client = new Client()
     .setEndpoint("https://fra.cloud.appwrite.io/v1")
     .setProject("kafmap");
 
-const BASE_URL = "/api/db";
+const BASE_URL = "/api/db/v1";
 
 async function hashPassword(password: string) {
     if (typeof crypto !== 'undefined' && crypto.subtle) {

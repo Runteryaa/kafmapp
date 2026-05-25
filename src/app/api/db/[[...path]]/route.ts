@@ -43,10 +43,16 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
     }
 
     // --- REFINED SECURITY CHECK ---
-    const isUserRelated = path === 'users' || path.startsWith('users/');
+    // Handle versioning prefix (e.g., v1/) for internal checks
+    let checkPath = path;
+    if (checkPath.startsWith('v1/')) {
+        checkPath = checkPath.substring(3);
+    }
+
+    const isUserRelated = checkPath === 'users' || checkPath.startsWith('users/');
 
     if (isUserRelated) {
-        const isListRequest = path === 'users' || path === 'users/';
+        const isListRequest = checkPath === 'users' || checkPath === 'users/';
         const isAdmin = currentUser && currentUser.role === 'admin';
 
         if (req.method === 'GET') {
@@ -55,7 +61,8 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
                 if (!isAdmin) return NextResponse.json({ error: 'Forbidden: Admin access required for user list' }, { status: 403 });
             } else {
                 // Individual lookup (/users/ID): Allow if Admin OR self
-                const requestedId = pathArray[1];
+                const pathParts = checkPath.split('/');
+                const requestedId = pathParts[1];
                 const isSelf = currentUser && (currentUser.$id === requestedId || currentUser.id === requestedId);
                 
                 if (!isAdmin && !isSelf) {

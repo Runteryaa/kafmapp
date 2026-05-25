@@ -27,7 +27,7 @@ export default {
     const url = new URL(request.url);
 
     // 1. LOGIN API - Includes Role and Ban status for frontend compatibility
-    if (url.pathname === '/api/login' && request.method === 'POST') {
+    if (url.pathname === '/v1/api/login' && request.method === 'POST') {
       try {
         const { email, password } = await request.json();
         const ordsRes = await fetch(`${ORACLE_HOST}/users/?q={"email":"${email}"}`);
@@ -61,7 +61,7 @@ export default {
     }
 
     // 2. REGISTER API
-    if (url.pathname === '/api/register' && request.method === 'POST') {
+    if (url.pathname === '/v1/api/register' && request.method === 'POST') {
       try {
         const body = await request.json();
         const insertRes = await fetch(`${ORACLE_HOST}/users/`, {
@@ -94,7 +94,12 @@ export default {
     }
 
     // 3. GENERAL PROXY
-    const targetUrl = ORACLE_HOST + url.pathname + url.search;
+    // To support versioning on proxy endpoints, we strip /v1 if it exists so Oracle gets the correct path
+    let proxyPath = url.pathname;
+    if (proxyPath.startsWith('/v1/')) {
+      proxyPath = proxyPath.substring(3);
+    }
+    const targetUrl = ORACLE_HOST + proxyPath + url.search;
     const newRequest = new Request(targetUrl, {
       method: request.method,
       headers: request.headers,

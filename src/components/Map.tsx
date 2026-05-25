@@ -498,6 +498,7 @@ export default function MapComponent({
                 center={effectiveLocation ? [effectiveLocation.lat, effectiveLocation.lng] : [39.0, 35.0]}
                 zoom={effectiveLocation ? 15 : 6}
                 zoomControl={false}
+                attributionControl={false}
                 scrollWheelZoom={true}
                 style={{ height: "100%", width: "100%", zIndex: 0, background: theme === 'dark' ? '#1f2937' : '#f3f4f6' }}
             >

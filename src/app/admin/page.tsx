@@ -18,6 +18,7 @@ type Tab = 'submissions' | 'venues' | 'reviews' | 'users';
 export default function AdminPage() {
     const { user, logout, loading: authLoading } = useAuth();
     const [language, setLanguage] = useState<'tr' | 'en'>('tr');
+    const [isLanguageLoaded, setIsLanguageLoaded] = useState(false);
     const t = getTranslation(language);
     const [activeTab, setActiveTab] = useState<Tab>('submissions');
     const [submissionSubTab, setSubmissionSubTab] = useState<'all' | 'reports' | 'additions' | 'updates' | 'spam'>('all');
@@ -91,6 +92,29 @@ export default function AdminPage() {
             setIsLoading(false);
         }
     };
+
+    // Load language from local storage or system preference
+    useEffect(() => {
+        const savedLanguage = localStorage.getItem('language') as 'tr' | 'en' | null;
+        if (savedLanguage) {
+            setLanguage(savedLanguage);
+        } else {
+            const systemLang = navigator.language.toLowerCase();
+            if (systemLang.startsWith('tr')) {
+                setLanguage('tr');
+            } else {
+                setLanguage('en');
+            }
+        }
+        setIsLanguageLoaded(true);
+    }, []);
+
+    // Save language to local storage
+    useEffect(() => {
+        if (isLanguageLoaded) {
+            localStorage.setItem('language', language);
+        }
+    }, [language, isLanguageLoaded]);
 
     useEffect(() => {
         if (!authLoading && user && (user as any).role === 'admin') {
@@ -479,10 +503,10 @@ export default function AdminPage() {
                         </div>
                     )}
                     <button 
-                        onClick={() => logout()}
-                        className="flex items-center gap-2 text-sm font-bold text-red-500 hover:text-red-600 transition-colors w-full px-2 py-2 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10"
+                        onClick={() => window.location.href = '/'}
+                        className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors w-full px-2 py-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
-                        <X size={18} /> Logout
+                        <X size={18} /> Exit
                     </button>
                 </div>
             </div>
@@ -578,8 +602,8 @@ export default function AdminPage() {
                                                         </span>
                                                         <span className="text-[10px] text-gray-400 font-mono font-bold bg-gray-50 dark:bg-gray-900/50 px-3 py-1.5 rounded-xl"># {doc.placeId}</span>
                                                     </div>
-                                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{doc.placeName}</h3>
-                                                    <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2 font-medium"><MapPin size={16} className="text-amber-500" /> {parsedPayload.address || "Address unavailable"}</p>
+                                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{doc.placeName || parsedPayload.name || parsedPayload.placeName || "Unknown Place"}</h3>
+                                                    <p className="text-gray-500 dark:text-gray-400 flex items-center gap-2 font-medium"><MapPin size={16} className="text-amber-500" /> {parsedPayload.address || t.addressUnknown}</p>
 
                                                     {doc.type === 'report' ? (
                                                         <div className="mt-8 bg-red-50/50 dark:bg-red-900/10 p-6 rounded-2xl border border-red-100 dark:border-red-900/30">

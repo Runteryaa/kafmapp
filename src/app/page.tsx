@@ -81,6 +81,7 @@ const LIST_COLORS = [
 
 export default function Home() {
     const [language, setLanguage] = useState<'tr' | 'en'>('tr');
+    const [isLanguageLoaded, setIsLanguageLoaded] = useState(false);
     const t = getTranslation(language);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -629,6 +630,29 @@ export default function Home() {
         }
     }, [theme, isThemeLoaded]);
 
+    // Load language from local storage or system preference
+    useEffect(() => {
+        const savedLanguage = localStorage.getItem('language') as 'tr' | 'en' | null;
+        if (savedLanguage) {
+            setLanguage(savedLanguage);
+        } else {
+            const systemLang = navigator.language.toLowerCase();
+            if (systemLang.startsWith('tr')) {
+                setLanguage('tr');
+            } else {
+                setLanguage('en');
+            }
+        }
+        setIsLanguageLoaded(true);
+    }, []);
+
+    // Save language to local storage
+    useEffect(() => {
+        if (isLanguageLoaded) {
+            localStorage.setItem('language', language);
+        }
+    }, [language, isLanguageLoaded]);
+
     // Initial mobile detection
     useEffect(() => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -639,7 +663,30 @@ export default function Home() {
 
     // Auto-locate user on initial load
     useEffect(() => {
-        if (!navigator.geolocation) return;
+        const fallbackToIpLocation = async (isManual = false) => {
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const data = await res.json();
+                if (data && data.latitude && data.longitude) {
+                    const newLocation = { lat: data.latitude, lng: data.longitude };
+                    setUserLocation(newLocation);
+                    setFlyToLocation(newLocation);
+                    if (isManual) showToast(t.locationUpdated);
+                } else if (isManual) {
+                    showToast(t.unableToRetrieveLocation);
+                }
+            } catch (ipError) {
+                console.warn("IP-based fallback location also failed:", ipError);
+                if (isManual) showToast(t.unableToRetrieveLocation);
+            } finally {
+                setIsLocating(false);
+            }
+        };
+
+        if (!navigator.geolocation) {
+            fallbackToIpLocation();
+            return;
+        }
 
         setIsLocating(true);
         navigator.geolocation.getCurrentPosition(
@@ -654,7 +701,7 @@ export default function Home() {
             },
             (error) => {
                 console.warn("Auto-location failed on load:", error);
-                setIsLocating(false);
+                fallbackToIpLocation();
             }
         );
     }, []);
@@ -1035,7 +1082,7 @@ export default function Home() {
         let isMounted = true;
         setDynamicAddress(null); // reset
 
-        if (selectedPlace && selectedPlace.address === t.addressUnknown) {
+        if (selectedPlace && (selectedPlace.address === t.addressUnknown || selectedPlace.address === 'Adres bilinmiyor' || selectedPlace.address === 'Address unknown')) {
             setIsFetchingAddress(true);
             // Reverse geocoding via Nominatim
             fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${selectedPlace.lat}&lon=${selectedPlace.lng}&zoom=18&addressdetails=1`)
@@ -1375,8 +1422,31 @@ export default function Home() {
     };
 
     const handleLocateMe = () => {
+        const fallbackToIpLocation = async () => {
+            try {
+                const res = await fetch('https://ipwho.is/');
+                const data = await res.json();
+                if (data && data.success && data.latitude && data.longitude) {
+                    const newLocation = { lat: data.latitude, lng: data.longitude };
+                    setUserLocation(newLocation);
+                    setFlyToLocation(newLocation);
+                    setSelectedId(null);
+                    showToast(t.locationUpdated);
+                    console.log("Using IP-based location fallback (Manual).");
+                } else {
+                    showToast(t.unableToRetrieveLocation);
+                }
+            } catch (ipError) {
+                console.warn("IP-based fallback location also failed:", ipError);
+                showToast(t.unableToRetrieveLocation);
+            } finally {
+                setIsLocating(false);
+            }
+        };
+
         if (!navigator.geolocation) {
-            showToast(t.geolocationNotSupported);
+            setIsLocating(true);
+            fallbackToIpLocation();
             return;
         }
 
@@ -1393,9 +1463,11 @@ export default function Home() {
                 setSelectedId(null);
                 showToast(t.locationUpdated);
             },
-            () => {
-                setIsLocating(false);
-                showToast(t.unableToRetrieveLocation);
+            (error) => {
+                if (error.code !== 1) {
+                    console.warn("Manual location failed:", error);
+                }
+                fallbackToIpLocation();
             }
         );
     };
@@ -2428,7 +2500,7 @@ export default function Home() {
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h3 className={`font-semibold text-gray-900 dark:text-gray-100 truncate transition-colors pr-2 ${style.textHoverClass}`}>{place.name}</h3>
-                                                {place.address !== t.addressUnknown && (
+                                                {(place.address !== t.addressUnknown && place.address !== 'Adres bilinmiyor' && place.address !== 'Address unknown') && (
                                                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">{place.address}</p>
                                                 )}
 

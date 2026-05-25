@@ -121,6 +121,7 @@ export default function Home() {
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
     const [isAccountSettingsModalOpen, setIsAccountSettingsModalOpen] = useState(false);
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+    const [updateModalSection, setUpdateModalSection] = useState<'toilet' | 'wifi' | 'menu' | null>('toilet');
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
     const [placeReports, setPlaceReports] = useState<any[]>([]);
@@ -1167,7 +1168,7 @@ export default function Home() {
         // On mobile, this keeps the panel open but switches back to search results/nearby list
     }, []);
 
-    const handleOpenUpdateModal = async () => {
+    const handleOpenUpdateModal = async (section: 'toilet' | 'wifi' | 'menu' = 'toilet') => {
         await checkUserStatus(); // Verify session
         if (isUserBanned()) return;
         if (!user) {
@@ -1175,6 +1176,7 @@ export default function Home() {
             setIsLoginOpen(true);
             return;
         }
+        setUpdateModalSection(section);
         setIsUpdateModalOpen(true);
     };
 
@@ -1940,6 +1942,7 @@ export default function Home() {
                 isOpen={isUpdateModalOpen}
                 onClose={() => setIsUpdateModalOpen(false)}
                 place={selectedPlace || null}
+                initialSection={updateModalSection}
                 onSuccess={() => {
                     fetchDbPlaces(); // Refresh DB data
                     showToast(t.changesSubmittedForAdmin);
@@ -2198,7 +2201,7 @@ export default function Home() {
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide">{t.toiletCode}</p>
                                                     <div className="ml-auto flex items-center gap-1.5">
-                                                        <button onClick={handleOpenUpdateModal} className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors flex items-center justify-center bg-blue-100/50 dark:bg-blue-900/50 rounded-md p-1" title="Edit">
+                                                        <button onClick={() => handleOpenUpdateModal('toilet')} className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors flex items-center justify-center bg-blue-100/50 dark:bg-blue-900/50 rounded-md p-1" title="Edit">
                                                             <Pencil size={12} />
                                                         </button>
                                                     </div>
@@ -2223,7 +2226,7 @@ export default function Home() {
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <p className="text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide">{t.freeWifi}</p>
                                                     <div className="ml-auto flex items-center gap-1.5">
-                                                        <button onClick={handleOpenUpdateModal} className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition-colors flex items-center justify-center bg-green-100/50 dark:bg-green-900/50 rounded-md p-1" title="Edit">
+                                                        <button onClick={() => handleOpenUpdateModal('wifi')} className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition-colors flex items-center justify-center bg-green-100/50 dark:bg-green-900/50 rounded-md p-1" title="Edit">
                                                             <Pencil size={12} />
                                                         </button>
                                                     </div>
@@ -2251,7 +2254,7 @@ export default function Home() {
                                             <div className="flex items-center gap-2">
                                                 <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">{t.menuSnippet}</h3>
                                                 <div className="ml-auto flex items-center gap-1.5">
-                                                    <button onClick={handleOpenUpdateModal} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 p-1.5 rounded-md flex items-center justify-center" title={t.edit}>
+                                                    <button onClick={() => handleOpenUpdateModal('menu')} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 p-1.5 rounded-md flex items-center justify-center" title={t.edit}>
                                                         <Pencil size={12} />
                                                     </button>
                                                 </div>

@@ -94,6 +94,7 @@ export function LoginModal({ isOpen, onClose, onSwitchToRegister, t }: { isOpen:
                                         id="remember-me"
                                         name="remember-me"
                                         type="checkbox"
+                                        defaultChecked={true}
                                         className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
                                     />
                                     <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">

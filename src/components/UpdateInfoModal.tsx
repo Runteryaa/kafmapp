@@ -10,7 +10,8 @@ export function UpdateInfoModal({
     place,
     onSuccess,
     t,
-    checkIsSpam
+    checkIsSpam,
+    initialSection = 'toilet'
 }: {
     isOpen: boolean;
     onClose: () => void;
@@ -18,6 +19,7 @@ export function UpdateInfoModal({
     onSuccess: () => void;
     t: any;
     checkIsSpam: () => boolean;
+    initialSection?: 'toilet' | 'wifi' | 'menu' | null;
 }) {
     const [toiletPass, setToiletPass] = useState("");
     const [wifiPass, setWifiPass] = useState("");
@@ -25,7 +27,13 @@ export function UpdateInfoModal({
     const [menuUrl, setMenuUrl] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [expandedSection, setExpandedSection] = useState<'toilet' | 'wifi' | 'menu' | null>('toilet');
+    const [expandedSection, setExpandedSection] = useState<'toilet' | 'wifi' | 'menu' | null>(initialSection);
+
+    useEffect(() => {
+        if (isOpen) {
+            setExpandedSection(initialSection);
+        }
+    }, [isOpen, initialSection]);
 
     useEffect(() => {
         if (place) {

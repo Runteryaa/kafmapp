@@ -161,7 +161,6 @@ export default function MapComponent({
     const [map, setMap] = useState<any>(null);
     const selectedPlace = useMemo(() => places.find(p => p.id === selectedId), [places, selectedId]);
     const [currentZoom, setCurrentZoom] = useState(15);
-    const [currentBounds, setCurrentBounds] = useState<any>(null);
     
     // IP Geolocation fallback state
     const [ipLocation, setIpLocation] = useState<LocationState | null>(null);
@@ -371,14 +370,12 @@ export default function MapComponent({
     const onZoomEnd = () => {
         if (!map) return;
         setCurrentZoom(map.getZoom());
-        setCurrentBounds(map.getBounds());
         if (fetchRef.current) clearTimeout(fetchRef.current);
         fetchRef.current = window.setTimeout(() => fetchPlaces(), 800); // Decreased debounce to 800ms for faster loads
     };
 
     const onMoveEnd = () => {
         if (!map) return;
-        setCurrentBounds(map.getBounds());
         if (fetchRef.current) clearTimeout(fetchRef.current);
         fetchRef.current = window.setTimeout(() => fetchPlaces(), 800); // Decreased debounce to 800ms for faster loads
     };
@@ -386,7 +383,6 @@ export default function MapComponent({
     useEffect(() => {
         if (map) {
             fetchPlaces();
-            setCurrentBounds(map.getBounds());
             if (onMapReady) onMapReady(map);
         }
         return () => { if (fetchRef.current) clearTimeout(fetchRef.current); };
@@ -426,66 +422,6 @@ export default function MapComponent({
         return new Date(p.premiumUntil) <= new Date();
     }), [places, favoritePlaceIds]);
 
-    // --- Supercluster Logic for Min Points ---
-    const scIndex = useMemo(() => {
-        const index = new Supercluster({
-            radius: 120,
-            maxZoom: 16,
-            minPoints: 4 // Only cluster if 4 or more points
-        });
-        
-        index.load(regularPlaces.map(p => ({
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
-            properties: { place: p }
-        })) as any);
-        
-        return index;
-    }, [regularPlaces]);
-
-    const { clusteredMarkers, individualMarkers } = useMemo(() => {
-        if (!currentBounds) {
-            return { clusteredMarkers: [], individualMarkers: [] };
-        }
-
-        const bbox: [number, number, number, number] = [
-            currentBounds.getWest(),
-            currentBounds.getSouth(),
-            currentBounds.getEast(),
-            currentBounds.getNorth()
-        ];
-
-        try {
-            // Determine calculation zoom - cap at index maxZoom but allow checking higher zooms
-            const queryZoom = Math.floor(currentZoom);
-            const clusters = scIndex.getClusters(bbox, queryZoom);
-            const clustered: Place[] = [];
-            const individual: Place[] = [];
-
-            clusters.forEach(c => {
-                if (c.properties?.cluster) {
-                    // If zoom is very high (>= 17), we "open" the visible clusters into individual markers
-                    if (currentZoom >= 17) {
-                        const leaves = scIndex.getLeaves(c.id as number, Infinity);
-                        individual.push(...leaves.map(l => l.properties.place));
-                    } else {
-                        // Regular cluster (6+ points due to scIndex config)
-                        const leaves = scIndex.getLeaves(c.id as number, Infinity);
-                        clustered.push(...leaves.map(l => l.properties.place));
-                    }
-                } else {
-                    // Single point or member of a small group that didn't cluster
-                    individual.push(c.properties.place);
-                }
-            });
-
-            return { clusteredMarkers: clustered, individualMarkers: individual };
-        } catch (e) {
-            console.error("Supercluster calculation failed", e);
-            return { clusteredMarkers: [], individualMarkers: [] };
-        }
-    }, [scIndex, currentBounds, currentZoom]);
-
     return (
         <div style={{ height: "100%", width: "100%", position: "absolute", inset: 0 }}>
             {!showMarkers && (
@@ -522,15 +458,11 @@ export default function MapComponent({
                             spiderfyOnMaxZoom={false}
                             zoomToBoundsOnClick={true}
                             disableClusteringAtZoom={17}
-                            removeOutsideVisibleBounds={true}
                         >
-                            {clusteredMarkers.map((place) => (
+                            {regularPlaces.map((place) => (
                                 <PlaceMarker key={place.id} place={place} onSelect={onSelect} />
                             ))}
                         </MarkerClusterGroup>
-                        {individualMarkers.map((place) => (
-                            <PlaceMarker key={place.id} place={place} onSelect={onSelect} />
-                        ))}
                         {highlightedPlaces.map((place) => {
                             const isFav = favoritePlaceIds.includes(place.id.toString());
                             const favEntry = favorites?.find(f => f.placeId === place.id.toString());

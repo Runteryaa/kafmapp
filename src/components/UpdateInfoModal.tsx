@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Loader2, Save, Link, ChevronDown, KeyRound, Wifi, Uten
 import { databases } from '../lib/appwrite';
 import { Place } from '../lib/types';
 import { ID } from 'appwrite';
+import { useAuth } from '../hooks/useAuth';
 
 export function UpdateInfoModal({
     isOpen,
@@ -19,9 +20,10 @@ export function UpdateInfoModal({
     onSuccess: () => void;
     t: any;
     checkIsSpam: () => boolean;
-    initialSection?: 'toilet' | 'wifi' | 'menu' | null;
+    initialSection?: 'toilet' | 'wifi' | 'menu';
 }) {
-    const [toiletPass, setToiletPass] = useState("");
+    const { user } = useAuth();
+    const [toiletPass, setToiletPass] = useState(place?.toiletPass || '');
     const [wifiPass, setWifiPass] = useState("");
     const [menu, setMenu] = useState<{ item: string, price: string }[]>([{ item: '', price: '' }]);
     const [menuUrl, setMenuUrl] = useState("");
@@ -69,15 +71,21 @@ export function UpdateInfoModal({
 
         try {
             const isSpam = checkIsSpam();
+            const userRole = (user as any)?.role || 'user';
+            const shouldBeRegistered = userRole === 'admin' || userRole === 'explorer';
 
             // If the place is not registered yet, register it instantly to show on map, but only IF NOT SPAM
             if (!place.isRegistered && !isSpam) {
                 const docId = `place_${place.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
-                const instantPayload = { ...payload, isRegistered: true, ratingSum: "0", ratingCount: "0" };
+                const instantPayload = { ...payload, isRegistered: shouldBeRegistered, ratingSum: "0", ratingCount: "0" };
                 try {
                     await databases.createDocument('kafmap', 'places', docId, instantPayload);
                 } catch (e: any) {
-                    if (e.code === 409) await databases.updateDocument('kafmap', 'places', docId, instantPayload);
+                    // If it already exists, it means at least one user already acted on it.
+                    // If we are a standard user, this is the second action, so we can register it.
+                    if (e.code === 409) {
+                        await databases.updateDocument('kafmap', 'places', docId, { ...payload, isRegistered: true });
+                    }
                 }
             }
 

@@ -875,16 +875,11 @@ export default function Home() {
                         const currentSum = doc.ratingSum ? Number(doc.ratingSum) : 0;
                         const currentCount = doc.ratingCount ? Number(doc.ratingCount) : 0;
                         await databases.updateDocument('kafmap', 'places', docId, {
-                            ratingSum: (currentSum + ratingDiff).toString()
+                            ratingSum: (currentSum + ratingDiff).toString(),
+                            isRegistered: true
                         });
                         
-                        // Update local UI immediately
-                        setDbPlaces((prev: Place[]) => prev.map(p => {
-                            if (p.id === selectedPlace.id) {
-                                return { ...p, rating: currentCount > 0 ? (currentSum + ratingDiff) / currentCount : 0 };
-                            }
-                            return p;
-                        }));
+                        fetchDbPlaces(); // Refresh local data immediately
                     } catch (err) {}
                 }
                 showToast(t.reviewUpdated || "Review updated!");
@@ -910,14 +905,26 @@ export default function Home() {
                 });
 
                 // Update place rating aggregate
+                const userRole = (user as any).role || 'user';
+                const shouldBeRegistered = userRole === 'admin' || userRole === 'explorer';
+
                 try {
                     const doc = await databases.getDocument('kafmap', 'places', docId);
                     const currentSum = doc.ratingSum ? Number(doc.ratingSum) : 0;
                     const currentCount = doc.ratingCount ? Number(doc.ratingCount) : 0;
-                    await databases.updateDocument('kafmap', 'places', docId, {
+                    const newCount = currentCount + 1;
+                    
+                    const updatePayload: any = {
                         ratingSum: (currentSum + reviewRating).toString(),
-                        ratingCount: (currentCount + 1).toString()
-                    });
+                        ratingCount: newCount.toString(),
+                    };
+                    
+                    // Rule: Register if admin/explorer OR if we have 2 or more unique ratings/actions
+                    if (shouldBeRegistered || newCount >= 2) {
+                        updatePayload.isRegistered = true;
+                    }
+
+                    await databases.updateDocument('kafmap', 'places', docId, updatePayload);
                 } catch (err: any) {
                     if (err.code === 404) {
                         await databases.createDocument('kafmap', 'places', docId, {
@@ -928,12 +935,14 @@ export default function Home() {
                             type: selectedPlace.type,
                             address: selectedPlace.address,
                             ratingSum: reviewRating.toString(),
-                            ratingCount: "1"
+                            ratingCount: "1",
+                            isRegistered: shouldBeRegistered // First user action: only register if admin/explorer
                         });
                     }
                 }
                 showToast(t.ratingSubmitted);
                 setEditingReviewId(newId); // Keep form in edit mode
+                fetchDbPlaces(); // Refresh local data immediately
             }
 
             fetchReviews(selectedPlace.id.toString());

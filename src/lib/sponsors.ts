@@ -4,7 +4,7 @@ export const activeSponsors: Sponsor[] = [
     {
         id: "sponsorme",
         title: "Sponsor Olun!",
-        description: "Kaf'Mapin sponsorluklar dışında bir geliri yoktur. Eğer bir işletme sahibiyseniz kendi mekanınızı öne çıkarmak için Premium alabilirsiniz. Eğer kullanıcıysanız bağış yapabilirsiniz. Şimiden teşekkürler",
+        description: "Kaf'Map'in sponsorluklar dışında bir geliri yoktur. Eğer bir işletme sahibiyseniz kendi mekanınızı öne çıkarmak için Premium alabilirsiniz. Eğer kullanıcıysanız bağış yapabilirsiniz. Şimdiden teşekkürler :)",
         linkUrl: "https://buymeacoffee.com/runterya",
         isActive: true,
         position: "bottom"

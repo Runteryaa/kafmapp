@@ -276,7 +276,7 @@ export default function AdminPage() {
             }
 
             const payload = JSON.parse(doc.payload);
-            const docId = `place_${payload.placeId}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+            const docId = payload.placeId.toString();
             console.log("Admin: Target place docId", docId);
 
             try {
@@ -455,47 +455,56 @@ export default function AdminPage() {
 
     return (
         <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0f172a] flex flex-col md:flex-row">
-            {/* Sidebar */}
-            <div className="w-full md:w-72 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 p-6 flex flex-col shrink-0">
-                <div className="flex items-center gap-3 mb-10 px-2">
-                    <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
-                        <ShieldCheck size={24} className="text-white" />
+            {/* Sidebar / Top Navigation on Mobile */}
+            <div className="w-full md:w-72 bg-white dark:bg-gray-900 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 p-4 md:p-6 flex flex-col md:shrink-0 sticky top-0 z-50 md:static">
+                <div className="flex items-center justify-between md:mb-10 px-2 md:px-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+                            <ShieldCheck size={24} className="text-white" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-black text-gray-900 dark:text-white leading-tight">Admin</h2>
+                            <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest hidden md:block">KafMap Manager</p>
+                        </div>
                     </div>
-                    <div>
-                        <h2 className="text-lg font-black text-gray-900 dark:text-white leading-tight">Admin</h2>
-                        <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest">KafMap Manager</p>
-                    </div>
+                    {/* Mobile Exit Button */}
+                    <button 
+                        onClick={() => window.location.href = '/'}
+                        className="md:hidden p-2 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                        <X size={20} />
+                    </button>
                 </div>
 
-                <nav className="space-y-2 flex-1">
+                <nav className="flex flex-row md:flex-col gap-2 overflow-x-auto no-scrollbar py-2 md:py-0 mt-4 md:mt-0 md:space-y-2 md:flex-1">
                     <button 
                         onClick={() => setActiveTab('submissions')}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'submissions' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                        className={`shrink-0 md:w-full flex items-center gap-2 md:gap-3 px-4 py-2.5 md:py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'submissions' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                     >
-                        <LayoutDashboard size={20} /> Submissions
-                        {pendingUpdates.length > 0 && <span className="ml-auto bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full">{pendingUpdates.length}</span>}
+                        <LayoutDashboard size={20} /> <span className="whitespace-nowrap">Submissions</span>
+                        {pendingUpdates.length > 0 && <span className="ml-1 md:ml-auto bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full">{pendingUpdates.length}</span>}
                     </button>
                     <button 
                         onClick={() => setActiveTab('venues')}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'venues' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                        className={`shrink-0 md:w-full flex items-center gap-2 md:gap-3 px-4 py-2.5 md:py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'venues' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                     >
-                        <Store size={20} /> Manage Venues
+                        <Store size={20} /> <span className="whitespace-nowrap">Manage Venues</span>
                     </button>
                     <button 
                         onClick={() => setActiveTab('reviews')}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'reviews' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                        className={`shrink-0 md:w-full flex items-center gap-2 md:gap-3 px-4 py-2.5 md:py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'reviews' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                     >
-                        <MessageSquare size={20} /> Reviews
+                        <MessageSquare size={20} /> <span className="whitespace-nowrap">Reviews</span>
                     </button>
                     <button 
                         onClick={() => setActiveTab('users')}
-                        className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'users' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                        className={`shrink-0 md:w-full flex items-center gap-2 md:gap-3 px-4 py-2.5 md:py-3.5 rounded-2xl text-sm font-bold transition-all ${activeTab === 'users' ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
                     >
-                        <User size={20} /> Manage Users
+                        <User size={20} /> <span className="whitespace-nowrap">Manage Users</span>
                     </button>
                 </nav>
 
-                <div className="mt-auto pt-6 border-t border-gray-100 dark:border-gray-800 px-2">
+                <div className="hidden md:block mt-auto pt-6 border-t border-gray-100 dark:border-gray-800 px-2">
                     {user && (
                         <div className="mb-4 px-2">
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Logged in as</p>

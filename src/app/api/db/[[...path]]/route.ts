@@ -27,8 +27,13 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
     const pathArray = params.path || [];
     let path = pathArray.join('/');
     
-    // Crucial: Restore trailing slash for ORDS
-    if (req.nextUrl.pathname.endsWith('/') && path && !path.endsWith('/')) {
+    // Crucial: Oracle ORDS requires trailing slashes for collection endpoints (e.g. /reviews/)
+    // but returns 404 if a trailing slash is added to an item endpoint (e.g. /reviews/123/)
+    // pathArray length 2 means collection (e.g. ['v1', 'reviews'])
+    // pathArray length 3 means item (e.g. ['v1', 'reviews', '123'])
+    if (pathArray.length === 2 && !path.endsWith('/')) {
+        path += '/';
+    } else if (req.nextUrl.pathname.endsWith('/') && path && !path.endsWith('/') && pathArray.length !== 3) {
         path += '/';
     }
 

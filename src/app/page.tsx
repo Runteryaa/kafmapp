@@ -355,40 +355,15 @@ export default function Home() {
             if (p) {
                 const placeId = Number(p);
                 if (!isNaN(placeId)) {
-                    // Try to fetch the specific place from DB first
+                    // Try to fetch the specific place from DB
                     fetch(`/api/db/v1/places/${placeId}`)
                         .then(r => r.ok ? r.json() : null)
-                        .then(async (data) => {
+                        .then(data => {
                             if (data && data.lat && data.lng) {
                                 setFlyToLocation({ lat: parseFloat(data.lat), lng: parseFloat(data.lng) });
                                 setSelectedId(placeId);
                                 if (isMobile) setIsMobilePanelOpen(true);
                                 window.history.replaceState({}, '', '/');
-                            } else {
-                                // Fallback: If not in DB, it might be an unregistered OSM place
-                                // Query Overpass API for its coordinates
-                                try {
-                                    const query = `[out:json][timeout:10];(node(${placeId});way(${placeId}););out center;`;
-                                    const res = await fetch("https://overpass-api.de/api/interpreter", {
-                                        method: "POST",
-                                        body: "data=" + encodeURIComponent(query),
-                                        headers: { "Content-Type": "application/x-www-form-urlencoded" }
-                                    });
-                                    if (res.ok) {
-                                        const osmData = await res.json();
-                                        if (osmData.elements && osmData.elements.length > 0) {
-                                            const el = osmData.elements[0];
-                                            const lat = el.type === 'node' ? el.lat : el.center.lat;
-                                            const lng = el.type === 'node' ? el.lon : el.center.lon;
-                                            setFlyToLocation({ lat, lng });
-                                            setSelectedId(placeId);
-                                            if (isMobile) setIsMobilePanelOpen(true);
-                                            window.history.replaceState({}, '', '/');
-                                        }
-                                    }
-                                } catch (osmErr) {
-                                    console.error("Failed to load shared OSM place:", osmErr);
-                                }
                             }
                         })
                         .catch(err => console.error("Failed to load shared place:", err));
@@ -2146,7 +2121,7 @@ export default function Home() {
             />
 
             {/* Toast Notification */}
-            <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-[2000] flex items-center gap-2 transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 pointer-events-none translate-y-2'}`}>
+            <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-4 py-2 rounded-full shadow-lg z-[10000] flex items-center gap-2 transition-all duration-300 ${toastMessage ? 'opacity-100 translate-y-0' : 'opacity-0 pointer-events-none translate-y-2'}`}>
                 <ShieldCheck size={18} className="text-green-400" />
                 <span className="text-sm font-medium">{toastMessage}</span>
             </div>
@@ -2282,13 +2257,15 @@ export default function Home() {
                                     <div className="flex items-start justify-between gap-4">
                                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight pr-2">{selectedPlace.name}</h2>
                                         <div className="flex shrink-0 gap-2 relative">
-                                            <button
-                                                onClick={() => handleSharePlace(selectedPlace)}
-                                                className="p-2 rounded-full transition-colors bg-gray-100 text-gray-500 hover:bg-amber-50 hover:text-amber-500 dark:bg-gray-800 dark:hover:bg-gray-700"
-                                                title={t.sharePlace || "Share Place"}
-                                            >
-                                                <Share size={20} />
-                                            </button>
+                                            {selectedPlace.isRegistered && (
+                                                <button
+                                                    onClick={() => handleSharePlace(selectedPlace)}
+                                                    className="p-2 rounded-full transition-colors bg-gray-100 text-gray-500 hover:bg-amber-50 hover:text-amber-500 dark:bg-gray-800 dark:hover:bg-gray-700"
+                                                    title={t.sharePlace || "Share Place"}
+                                                >
+                                                    <Share size={20} />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => setIsSaveModalOpen(true)}                                                className={`p-2 rounded-full transition-colors ${favorites.some(f => f.placeId === selectedPlace.id.toString()) ? 'bg-pink-100 text-pink-500 dark:bg-pink-900/30' : 'bg-gray-100 text-gray-400 hover:bg-pink-50 hover:text-pink-500 dark:bg-gray-800 dark:hover:bg-gray-700'}`}
                                                 title={t.favorites}

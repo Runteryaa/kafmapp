@@ -200,6 +200,9 @@ export const t = {
         licenseTitle: 'License Information',
         kvkkContent: 'KafMap ("We") values the privacy of our users. This text has been prepared to fulfill our legal obligation in accordance with the Law on the Protection of Personal Data (KVKK). We only collect minimal necessary data (Email, Name) to provide account services. Your location data is processed locally in your browser and not stored on our servers unless you explicitly submit a report or update.',
         licenseContent: 'GNU Affero General Public License v3.0 (AGPL-3.0)\n\nThis software is open source and licensed under the AGPLv3. You can access the full legal text at the link below:\n\nhttps://github.com/Runteryaa/kafmapp/blob/main/LICENSE',
+        sharePlace: 'Share Place',
+        linkCopied: 'Link copied to clipboard!',
+        failedToCopy: 'Failed to copy link',
     },
     tr: {
         searchPlaceholder: 'Kafe veya restoran ara...',
@@ -399,6 +402,9 @@ export const t = {
         licenseTitle: 'Lisans Bilgileri',
         kvkkContent: 'KafMap ("Biz"), kullanıcılarımızın gizliliğine önem veriyoruz. Bu metin, 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) uyarınca aydınlatma yükümlülüğümüzü yerine getirmek amacıyla hazırlanmıştır. Sadece hesap hizmetlerini sağlamak için gerekli olan minimum veriyi (E-posta, İsim) topluyoruz. Konum verileriniz tarayıcınızda yerel olarak işlenir ve siz açıkça bir mekan raporu veya güncelleme göndermediğiniz sürece sunucularımızda saklanmaz.',
         licenseContent: 'GNU Affero Genel Kamu Lisansı v3.0 (AGPLv3)\n\nBu program özgür bir yazılımdır: Özgür Yazılım Vakfı tarafından yayınlanan GNU Affero Genel Kamu Lisansı’nın 3. sürümü veya (isteğinize bağlı olarak) daha sonraki herhangi bir sürümü altındaki koşullara bağlı kalarak bu yazılımı yeniden dağıtabilir ve/veya değiştirebilirsiniz.\n\nBu yazılım faydalı olması umuduyla dağıtılmaktadır, ancak yazılımın HİÇBİR GARANTİSİ YOKTUR. Daha fazla bilgi için GNU Affero Genel Kamu Lisansı’nı inceleyin.',
+        sharePlace: 'Mekanı Paylaş',
+        linkCopied: 'Bağlantı kopyalandı!',
+        failedToCopy: 'Bağlantı kopyalanamadı',
     }
 };
 

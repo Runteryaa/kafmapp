@@ -21,12 +21,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const checkUserStatus = async () => {
+    const checkUserStatus = async (isBackgroundSync = false) => {
         try {
             const loggedInUser = await account.get();
             setUser(loggedInUser);
-        } catch (error) {
-            setUser(null);
+        } catch (error: any) {
+            // Only force logout if it's a definitive authentication failure (e.g., 401 Unauthorized or 403 Forbidden).
+            // If it's a network error (TypeError: Failed to fetch), 500, or 429 (Too Many Requests), we KEEP the current user session 
+            // to prevent random logouts during brief internet drops or rate limiting, especially during background syncs.
+            if (error.code === 401 || error.code === 403 || error.message === 'Not authenticated') {
+                setUser(null);
+            } else if (!isBackgroundSync) {
+                // If it's the initial load and we can't reach the server, but we have a cookie,
+                // we might want to trust the cookie temporarily, but for now, just don't clear the user
+                // if we already have one in state.
+                if (!user) setUser(null); 
+            }
         } finally {
             setLoading(false);
         }
@@ -39,7 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // This ensures roles/ban status update automatically without relogging
         const interval = setInterval(() => {
             if (typeof document !== 'undefined' && document.cookie.includes('kafmap_auth')) {
-                checkUserStatus();
+                checkUserStatus(true);
             }
         }, 60000);
 

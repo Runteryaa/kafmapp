@@ -82,7 +82,7 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
     });
 
     // Ensure client IP is passed to worker for rate limiting
-    const clientIP = req.ip || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip');
+    const clientIP = (req as any).ip || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip');
     if (clientIP && !headers.has('x-forwarded-for')) {
         headers.set('X-Forwarded-For', clientIP);
     }

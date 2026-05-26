@@ -60,9 +60,17 @@ const account = {
             const response = await fetch(url);
 
             if (!response.ok) {
-                // If user is deleted or record is gone, clear session
-                deleteCookie('kafmap_auth');
-                throw new Error('Session expired or account deleted');
+                // ONLY force logout if it's a definitive failure (401 Unauthorized, 403 Forbidden, 404 Not Found)
+                if (response.status === 401 || response.status === 403 || response.status === 404) {
+                    deleteCookie('kafmap_auth');
+                    throw new Error('Session expired or account deleted');
+                }
+                
+                // For temporary errors (429 Rate Limit, 500 Server Error, 502 Bad Gateway), 
+                // we throw but DO NOT delete the cookie to allow retry later.
+                const err: any = new Error(`Server error (${response.status})`);
+                err.code = response.status;
+                throw err;
             }
 
             const rawData = await response.json();

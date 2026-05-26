@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 import {
     MapPin, Search, Coffee, Utensils, Pizza, Beer,
     Star, ArrowLeft, KeyRound, Wifi, Copy, X, ShieldCheck, MapIcon, Maximize2, Loader2, Navigation,
-    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle, Pencil, ThumbsUp, MonitorSmartphone, Shuffle, SortAsc, Filter, ChevronDown, Check, Shield
+    Menu, Settings, LogIn, UserPlus, Moon, Sun, Languages, Plus, Minus, RefreshCw, LogOut, User, Flag, ExternalLink, AlertTriangle, Pencil, ThumbsUp, MonitorSmartphone, Shuffle, SortAsc, Filter, ChevronDown, Check, Shield, Share
 } from "lucide-react";
 import { mockPlaces, LocationState, Place, Review } from "../lib/types"; // Import data
 import { LoginModal, RegisterModal } from "../components/AuthModals";
@@ -93,7 +93,7 @@ export default function Home() {
     const [userLocation, setUserLocation] = useState<LocationState | null>(null);
     const [isLocating, setIsLocating] = useState(false);
     const [osmPlaces, setOsmPlaces] = useState<Place[]>([]);
-    const [isFetchingMap, setIsFetchingMap] = useState(false);
+    const [isFetchingMap, setIsFetchingMap] = useState(true);
     const [flyToLocation, setFlyToLocation] = useState<LocationState | null>(null);
     const [isSearchingCity, setIsSearchingCity] = useState(false);
     const [manualFetchTrigger, setManualFetchTrigger] = useState(0);
@@ -123,6 +123,7 @@ export default function Home() {
     const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
     const [updateModalSection, setUpdateModalSection] = useState<'toilet' | 'wifi' | 'menu' | null>('toilet');
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [legalView, setLegalView] = useState<'none' | 'kvkk' | 'license'>('none');
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
     const [placeReports, setPlaceReports] = useState<any[]>([]);
@@ -346,6 +347,56 @@ export default function Home() {
     const [dynamicAddress, setDynamicAddress] = useState<string | null>(null);
     const [isFetchingAddress, setIsFetchingAddress] = useState(false);
 
+    // Handle deep links (e.g. /p/123 -> /?p=123)
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            const p = urlParams.get('p');
+            if (p) {
+                const placeId = Number(p);
+                if (!isNaN(placeId)) {
+                    // Try to fetch the specific place from DB first
+                    fetch(`/api/db/v1/places/${placeId}`)
+                        .then(r => r.ok ? r.json() : null)
+                        .then(async (data) => {
+                            if (data && data.lat && data.lng) {
+                                setFlyToLocation({ lat: parseFloat(data.lat), lng: parseFloat(data.lng) });
+                                setSelectedId(placeId);
+                                if (isMobile) setIsMobilePanelOpen(true);
+                                window.history.replaceState({}, '', '/');
+                            } else {
+                                // Fallback: If not in DB, it might be an unregistered OSM place
+                                // Query Overpass API for its coordinates
+                                try {
+                                    const query = `[out:json][timeout:10];(node(${placeId});way(${placeId}););out center;`;
+                                    const res = await fetch("https://overpass-api.de/api/interpreter", {
+                                        method: "POST",
+                                        body: "data=" + encodeURIComponent(query),
+                                        headers: { "Content-Type": "application/x-www-form-urlencoded" }
+                                    });
+                                    if (res.ok) {
+                                        const osmData = await res.json();
+                                        if (osmData.elements && osmData.elements.length > 0) {
+                                            const el = osmData.elements[0];
+                                            const lat = el.type === 'node' ? el.lat : el.center.lat;
+                                            const lng = el.type === 'node' ? el.lon : el.center.lon;
+                                            setFlyToLocation({ lat, lng });
+                                            setSelectedId(placeId);
+                                            if (isMobile) setIsMobilePanelOpen(true);
+                                            window.history.replaceState({}, '', '/');
+                                        }
+                                    }
+                                } catch (osmErr) {
+                                    console.error("Failed to load shared OSM place:", osmErr);
+                                }
+                            }
+                        })
+                        .catch(err => console.error("Failed to load shared place:", err));
+                }
+            }
+        }
+    }, [isMobile]);
+
     // Boycott State
     const [isIsraelBoycottEnabled, setIsIsraelBoycottEnabled] = useState(false);
     const [isLocalBoycottEnabled, setIsLocalBoycottEnabled] = useState(false);
@@ -511,7 +562,7 @@ export default function Home() {
 
         if (newCount >= 2) {
             try {
-                const docId = `place_${selectedPlace.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+                const docId = selectedPlace.id.toString();
                 const placesPayload: any = { ...fullPayload };
 
                 if (placesPayload.toiletPass !== undefined && placesPayload.toiletPass !== selectedPlace.toiletPass) {
@@ -828,7 +879,7 @@ export default function Home() {
         }
 
         setIsSubmittingReview(true);
-        const docId = `place_${selectedPlace.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+        const docId = selectedPlace.id.toString();
 
         try {
             if (editingReviewId) {
@@ -937,7 +988,7 @@ export default function Home() {
         if (!selectedPlace) return;
         
         setIsSubmittingReview(true);
-        const docId = `place_${selectedPlace.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+        const docId = selectedPlace.id.toString();
 
         try {
             await databases.deleteDocument('kafmap', 'reviews', reviewId);
@@ -1001,7 +1052,7 @@ export default function Home() {
             return;
         }
 
-        const docId = `place_${selectedPlace.id}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+        const docId = selectedPlace.id.toString();
         try {
             const currentUpvotes = selectedPlace[`${field}Upvotes`] || 0;
             const updatePayload: any = {};
@@ -1278,7 +1329,7 @@ export default function Home() {
                 ratingCount: "0"
             };
 
-            const docId = `place_${tempId}`.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 36);
+            const docId = tempId;
 
             // ONLY Instantly add to DB if NOT spam
             if (!isSpam) {
@@ -1424,8 +1475,8 @@ export default function Home() {
                                     updateId: pendingUpdateItem.id,
                                     field: field === 'wc' ? 'toiletPass' : field === 'wifi' ? 'wifiPass' : 'menu',
                                     newValue: pendingUpdateItem.value,
-                                    currentVerifyCount: pendingUpdateItem.verifyCoundateItem.value,
-                       fullPayload: pendingUpdateItem.fullPayload
+                                    currentVerifyCount: pendingUpdateItem.verifyCount || 0,
+                                    fullPayload: pendingUpdateItem.fullPayload
                                 })}
                                 className="flex items-center justify-between gap-1.5 text-left text-[11px] font-medium text-green-700 bg-green-50 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors px-2 py-1.5 rounded-md w-full border border-green-200/50 dark:border-green-800/50"
                             >
@@ -1472,6 +1523,23 @@ export default function Home() {
                 </div>
             </div>
         );
+    };
+
+    const handleSharePlace = async (place: Place) => {
+        const url = `${window.location.origin}/p/${place.id}`;
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `${place.name} | KafMap`,
+                    url: url
+                });
+            } catch (err) {
+                console.log("Share cancelled or failed");
+            }
+        } else {
+            // Open fallback custom Share Modal for environments where native share API isn't supported (e.g. non-HTTPS localhost)
+            setIsShareModalOpen(true);
+        }
     };
 
     const handleLocateMe = () => {
@@ -1806,16 +1874,73 @@ export default function Home() {
                 t={t}
             />
 
+            {/* Custom Fallback Share Modal */}
+            {isShareModalOpen && selectedPlace && (
+                <div className="fixed inset-0 z-[6000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setIsShareModalOpen(false)}>
+                    <div className="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md shadow-2xl p-6 transform transition-all border border-gray-100 dark:border-gray-700" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-black text-gray-900 dark:text-white flex items-center gap-2">
+                                <Share size={20} className="text-amber-500" />
+                                {t.sharePlace || "Share Place"}
+                            </h3>
+                            <button onClick={() => setIsShareModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-xl p-4 mb-6 border border-gray-100 dark:border-gray-700 text-center space-y-2">
+                            <p className="text-sm font-black text-gray-800 dark:text-gray-200 line-clamp-2">{selectedPlace.name}</p>
+                            <p className="text-xs font-medium text-blue-500 truncate max-w-full px-2 selection:bg-blue-200">{`${window.location.origin}/p/${selectedPlace.id}`}</p>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        await navigator.clipboard.writeText(`${window.location.origin}/p/${selectedPlace.id}`);
+                                        showToast(t.linkCopied || "Link copied to clipboard!");
+                                        setIsShareModalOpen(false);
+                                    } catch (e) {
+                                        showToast(t.failedToCopy || "Failed to copy link");
+                                    }
+                                }}
+                                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl transition-all shadow-md shadow-amber-500/20 active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                <Copy size={18} /> Kopyala
+                            </button>
+                            <button
+                                onClick={() => setIsShareModalOpen(false)}
+                                className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-bold py-3 rounded-xl transition-colors active:scale-95"
+                            >
+                                {t.cancel || "İptal"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Settings Modal */}
             {isSettingsOpen && (
                 <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 sm:p-6 bg-gray-900/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col my-auto max-h-[90vh]">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden flex flex-col my-auto max-h-[95vh]">
                         
                         {/* Header - Simplified */}
                         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-                            <h3 className="font-black text-lg text-gray-900 dark:text-white tracking-tight">{t.settings}</h3>
+                            <div className="flex items-center gap-2">
+                                {legalView !== 'none' && (
+                                    <button 
+                                        onClick={() => setLegalView('none')}
+                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 transition-colors"
+                                    >
+                                        <ArrowLeft size={18} />
+                                    </button>
+                                )}
+                                <h3 className="font-black text-lg text-gray-900 dark:text-white tracking-tight">
+                                    {legalView === 'kvkk' ? t.privacyPolicyTitle : legalView === 'license' ? t.licenseTitle : t.settings}
+                                </h3>
+                            </div>
                             <button
-                                onClick={() => setIsSettingsOpen(false)}
+                                onClick={() => { setIsSettingsOpen(false); setLegalView('none'); }}
                                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                             >
                                 <X size={20} />
@@ -1879,7 +2004,7 @@ export default function Home() {
                                         </div>
                                     </section>
 
-                                    {/* Privacy & Ethics Section */}
+                                    {/* Boycott Section */}
                                     <section>
                                         <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
                                             <Shield size={12} /> {t.boycottSettings || "Privacy & Filters"}
@@ -1894,16 +2019,13 @@ export default function Home() {
                                                 className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${isIsraelBoycottEnabled ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'bg-gray-50 dark:bg-gray-800/40 border-gray-100 dark:border-gray-800'}`}
                                             >
                                                 <div className="flex flex-col items-start gap-0.5">
-                                                    <span className={`text-sm font-black ${isIsraelBoycottEnabled ? 'text-red-700 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                        {t.israelBoycott || "Israel Boycott"}
-                                                    </span>
-                                                    <span className="text-[10px] text-gray-500 font-medium">Hides major international chains</span>
+                                                    <span className={`text-sm font-black ${isIsraelBoycottEnabled ? 'text-red-700 dark:text-red-400' : 'text-gray-700 dark:text-gray-300'}`}>{t.israelBoycott || "Israel Boycott"}</span>
+                                                    <span className="text-[10px] text-gray-500 font-medium">{t.israelBoycottDesc}</span>
                                                 </div>
                                                 <div className={`w-10 h-5 rounded-full relative transition-colors ${isIsraelBoycottEnabled ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-700'}`}>
                                                     <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${isIsraelBoycottEnabled ? 'left-6' : 'left-1'}`} />
                                                 </div>
                                             </button>
-
                                             <button
                                                 onClick={() => {
                                                     const newVal = !isLocalBoycottEnabled;
@@ -1913,9 +2035,7 @@ export default function Home() {
                                                 className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${isLocalBoycottEnabled ? 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800' : 'bg-gray-50 dark:bg-gray-800/40 border-gray-100 dark:border-gray-800'}`}
                                             >
                                                 <div className="flex flex-col items-start gap-0.5">
-                                                    <span className={`text-sm font-black ${isLocalBoycottEnabled ? 'text-orange-700 dark:text-orange-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                                                        {t.localBoycott}
-                                                    </span>
+                                                    <span className={`text-sm font-black ${isLocalBoycottEnabled ? 'text-orange-700 dark:text-orange-400' : 'text-gray-700 dark:text-gray-300'}`}>{t.localBoycott}</span>
                                                     <span className="text-[10px] text-gray-500 font-medium">{t.localBoycottDesc}</span>
                                                 </div>
                                                 <div className={`w-10 h-5 rounded-full relative transition-colors ${isLocalBoycottEnabled ? 'bg-orange-500' : 'bg-gray-300 dark:bg-gray-700'}`}>
@@ -1931,36 +2051,24 @@ export default function Home() {
                                             <User size={12} /> {t.accountSettings || "Account"}
                                         </h4>
                                         {user ? (
-                                            <div className="bg-gray-50 dark:bg-gray-800/40 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                                <div className="flex items-center gap-4 w-full">
-                                                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-lg">
-                                                        <User size={24} />
+                                            <div className="bg-gray-50 dark:bg-gray-800/40 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex items-center justify-between gap-4">
+                                                <div className="flex items-center gap-3 truncate">
+                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-lg shrink-0">
+                                                        <User size={20} />
                                                     </div>
-                                                    <div className="flex-1 truncate">
+                                                    <div className="truncate">
                                                         <p className="text-sm font-black text-gray-900 dark:text-white truncate">{(user as any).name || (user as any).email}</p>
                                                         <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{(user as any).role || 'Explorer'}</p>
                                                     </div>
                                                 </div>
-                                                <button
-                                                    onClick={() => {
-                                                        setIsSettingsOpen(false);
-                                                        setIsAccountSettingsModalOpen(true);
-                                                    }}
-                                                    className="w-full sm:w-auto px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-black rounded-lg hover:scale-105 active:scale-95 transition-all shadow-lg"
-                                                >
-                                                    {t.manage || "Manage"}
+                                                <button onClick={() => { setIsSettingsOpen(false); setIsAccountSettingsModalOpen(true); }} className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-black rounded-lg hover:scale-105 active:scale-95 transition-all shadow-lg">
+                                                    {t.manage}
                                                 </button>
                                             </div>
                                         ) : (
                                             <div className="bg-amber-50 dark:bg-amber-900/10 rounded-xl p-5 border border-amber-100 dark:border-amber-900/30 text-center">
-                                                <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-3">{t.loginToUnlockExtra || "Login to sync your data"}</p>
-                                                <button 
-                                                    onClick={() => {
-                                                        setIsSettingsOpen(false);
-                                                        setIsLoginOpen(true);
-                                                    }}
-                                                    className="px-8 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-lg shadow-lg shadow-amber-500/20 transition-all"
-                                                >
+                                                <p className="text-xs font-bold text-amber-800 dark:text-amber-400 mb-3">{t.loginToUnlockExtra}</p>
+                                                <button onClick={() => { setIsSettingsOpen(false); setIsLoginOpen(true); }} className="px-8 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-lg shadow-lg shadow-amber-500/20 transition-all">
                                                     {t.signIn}
                                                 </button>
                                             </div>
@@ -1984,7 +2092,7 @@ export default function Home() {
                             )}
                         </div>
 
-                        {/* Footer Section - Space Efficient */}
+                        {/* Footer Section */}
                         <div className="px-6 py-3 border-t border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30 flex flex-col gap-2">
                             <div className="flex items-center justify-between">
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">KafMap v1.0</span>
@@ -2001,20 +2109,8 @@ export default function Home() {
                                 <button
                                     onClick={() => {
                                         if (confirm(t.resetConfirm || "Are you sure you want to reset all customizations?")) {
-                                            localStorage.removeItem('theme');
-                                            localStorage.removeItem('language');
-                                            localStorage.removeItem('israelBoycott');
-                                            localStorage.removeItem('localBoycott');
-                                            localStorage.removeItem('filterType');
-                                            localStorage.removeItem('sortType');
-                                            setTheme('light');
-                                            setLanguage('tr');
-                                            setIsIsraelBoycottEnabled(false);
-                                            setIsLocalBoycottEnabled(false);
-                                            setFilterType('all');
-                                            setSortType('rating');
-                                            showToast(t.customizationsReset || "Customizations reset successfully");
-                                            setIsSettingsOpen(false);
+                                            localStorage.clear();
+                                            window.location.reload();
                                         }
                                     }}
                                     className="text-[10px] font-black text-red-500/60 hover:text-red-600 transition-all flex items-center gap-1 shrink-0"
@@ -2186,9 +2282,15 @@ export default function Home() {
                                     <div className="flex items-start justify-between gap-4">
                                         <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight pr-2">{selectedPlace.name}</h2>
                                         <div className="flex shrink-0 gap-2 relative">
-                                            <button 
-                                                onClick={() => setIsSaveModalOpen(true)}
-                                                className={`p-2 rounded-full transition-colors ${favorites.some(f => f.placeId === selectedPlace.id.toString()) ? 'bg-pink-100 text-pink-500 dark:bg-pink-900/30' : 'bg-gray-100 text-gray-400 hover:bg-pink-50 hover:text-pink-500 dark:bg-gray-800 dark:hover:bg-gray-700'}`}
+                                            <button
+                                                onClick={() => handleSharePlace(selectedPlace)}
+                                                className="p-2 rounded-full transition-colors bg-gray-100 text-gray-500 hover:bg-amber-50 hover:text-amber-500 dark:bg-gray-800 dark:hover:bg-gray-700"
+                                                title={t.sharePlace || "Share Place"}
+                                            >
+                                                <Share size={20} />
+                                            </button>
+                                            <button
+                                                onClick={() => setIsSaveModalOpen(true)}                                                className={`p-2 rounded-full transition-colors ${favorites.some(f => f.placeId === selectedPlace.id.toString()) ? 'bg-pink-100 text-pink-500 dark:bg-pink-900/30' : 'bg-gray-100 text-gray-400 hover:bg-pink-50 hover:text-pink-500 dark:bg-gray-800 dark:hover:bg-gray-700'}`}
                                                 title={t.favorites}
                                             >
                                                 <Star size={20} className={favorites.some(f => f.placeId === selectedPlace.id.toString()) ? 'fill-current' : ''} />
@@ -2606,6 +2708,20 @@ export default function Home() {
                             </h2>
 
                             <div className="space-y-3 pb-8">
+                                {isFetchingMap && filteredPlaces.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center py-12 px-4 text-center animate-fade-in">
+                                        <div className="mb-4">
+                                            <Coffee size={32} className="text-amber-500 animate-bounce" />
+                                        </div>
+                                        <h3 className="text-sm font-black text-gray-900 dark:text-white mb-2 tracking-tight">
+                                            {language === 'tr' ? "Espresso makineleri ısınıyor..." : "Warming up espresso machines..."}
+                                        </h3>
+                                        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 max-w-[200px] mx-auto">
+                                            {language === 'tr' ? "Etraftaki en iyi mekanlar haritaya dökülüyor, azıcık sabır!" : "Mapping the best places around you, hang tight!"}
+                                        </p>
+                                    </div>
+                                )}
+
                                 {filteredPlaces.length === 0 && !isFetchingMap && (
                                     <div className="text-center text-gray-500 dark:text-gray-400 py-8">
                                         <MapIcon size={24} className="mx-auto mb-2 text-gray-400 dark:text-gray-600" />

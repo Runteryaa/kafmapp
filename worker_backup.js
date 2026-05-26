@@ -8,16 +8,26 @@ export default {
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Token",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Admin-Token, X-Admin-Role",
     };
 
     if (request.method === "OPTIONS") {
       return new Response(null, { headers: corsHeaders });
     }
 
-    const clientIP = request.headers.get("x-forwarded-for") || request.headers.get("CF-Connecting-IP");
-    
-    if (clientIP) {
+    // Detect client IP. We prefer X-Forwarded-For passed by our proxy.
+    // CF-Connecting-IP might be our proxy's server IP, so we avoid using it as a fallback
+    // for rate limiting to prevent blocking the entire server.
+    const clientIP = request.headers.get("x-forwarded-for");
+    const providedToken = request.headers.get('X-Admin-Token');
+    const isAdminRole = request.headers.get('X-Admin-Role') === 'true';
+
+    // Bypass rate limit for verified admins
+    const isBypassLimit = providedToken === ADMIN_TOKEN && isAdminRole;
+
+    // We only apply rate limiting if we have a valid client IP. 
+    // If no IP is detected, we skip to avoid blocking the proxy server.
+    if (clientIP && !isBypassLimit) {
       const now = Date.now();
       const ipData = rateLimitMap.get(clientIP) || { count: 0, firstRequestTime: now };
 
@@ -44,7 +54,6 @@ export default {
       }
     }
 
-    const providedToken = request.headers.get('X-Admin-Token');
     if (providedToken !== ADMIN_TOKEN) {
       return new Response(JSON.stringify({ error: "Access Denied: Invalid security token." }), { 
         status: 401, 

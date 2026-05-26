@@ -46,6 +46,7 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
     if (authCookie) {
         try { currentUser = JSON.parse(decodeURIComponent(authCookie)); } catch (e) {}
     }
+    const isAdmin = currentUser && currentUser.role === 'admin';
 
     // --- REFINED SECURITY CHECK ---
     // Handle versioning prefix (e.g., v1/) for internal checks
@@ -58,7 +59,6 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
 
     if (isUserRelated) {
         const isListRequest = checkPath === 'users' || checkPath === 'users/';
-        const isAdmin = currentUser && currentUser.role === 'admin';
 
         if (isListRequest) {
             // Global list (GET or POST): Admin only. (POST /users/ is for registration but that goes through Worker /api/register)
@@ -76,13 +76,22 @@ async function handleProxy(req: NextRequest, segmentData: { params: Promise<{ pa
     }
 
     const headers = new Headers();
-    ['content-type', 'accept', 'accept-language'].forEach(h => {
+    ['content-type', 'accept', 'accept-language', 'x-forwarded-for', 'x-real-ip'].forEach(h => {
         const val = req.headers.get(h);
         if (val) headers.set(h, val);
     });
 
+    // Ensure client IP is passed to worker for rate limiting
+    const clientIP = req.ip || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip');
+    if (clientIP && !headers.has('x-forwarded-for')) {
+        headers.set('X-Forwarded-For', clientIP);
+    }
+
     if (ADMIN_TOKEN) {
         headers.set('X-Admin-Token', ADMIN_TOKEN);
+    }
+    if (isAdmin) {
+        headers.set('X-Admin-Role', 'true');
     }
 
     try {

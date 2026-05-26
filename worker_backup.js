@@ -1,4 +1,5 @@
 const rateLimitMap = new Map();
+const failedLoginMap = new Map();
 
 export default {
   async fetch(request, env, ctx) {
@@ -15,18 +16,12 @@ export default {
       return new Response(null, { headers: corsHeaders });
     }
 
-    // Detect client IP. We prefer X-Forwarded-For passed by our proxy.
-    // CF-Connecting-IP might be our proxy's server IP, so we avoid using it as a fallback
-    // for rate limiting to prevent blocking the entire server.
     const clientIP = request.headers.get("x-forwarded-for");
     const providedToken = request.headers.get('X-Admin-Token');
     const isAdminRole = request.headers.get('X-Admin-Role') === 'true';
 
-    // Bypass rate limit for verified admins
     const isBypassLimit = providedToken === ADMIN_TOKEN && isAdminRole;
 
-    // We only apply rate limiting if we have a valid client IP. 
-    // If no IP is detected, we skip to avoid blocking the proxy server.
     if (clientIP && !isBypassLimit) {
       const now = Date.now();
       const ipData = rateLimitMap.get(clientIP) || { count: 0, firstRequestTime: now };
@@ -55,7 +50,8 @@ export default {
     }
 
     if (providedToken !== ADMIN_TOKEN) {
-      return new Response(JSON.stringify({ error: "Access Denied: Invalid security token." }), { 
+      console.error(`Yetkisiz Erişim Denemesi. IP: ${clientIP || 'Bilinmiyor'}, Token: ${providedToken}`);
+      return new Response(JSON.stringify({ error: "Access Denied: Invalid security token!" }), { 
         status: 401, 
         headers: { "Content-Type": "application/json", ...corsHeaders } 
       });
@@ -80,6 +76,7 @@ export default {
         try {
           body = await request.json();
         } catch (err) {
+          console.error("Login API - JSON Parse Hatası:", err.message);
           return new Response(JSON.stringify({ error: "Invalid JSON payload" }), { 
             status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } 
           });
@@ -93,6 +90,25 @@ export default {
           });
         }
 
+        const now = Date.now();
+        const lockoutDuration = 10 * 60 * 1000;
+        let loginAttempts = failedLoginMap.get(email) || { count: 0, firstFailTime: now };
+
+        if (loginAttempts.count >= 5) {
+          if (now - loginAttempts.firstFailTime < lockoutDuration) {
+            console.warn(`Kilitli hesaba giriş denemesi engellendi: ${email}`);
+            return new Response(JSON.stringify({ 
+              error: "Çok fazla hatalı giriş denemesi. Lütfen 15 dakika sonra tekrar deneyin." 
+            }), { 
+              status: 429, 
+              headers: { "Content-Type": "application/json", "Retry-After": "900", ...corsHeaders } 
+            });
+          } else {
+            loginAttempts = { count: 0, firstFailTime: now };
+          }
+        }
+        // -------------------------------------------
+
         const hashedPassword = await hashPassword(password);
         const filter = JSON.stringify({ email });
         const ordsRes = await fetch(`${ORACLE_HOST}/users/?q=${encodeURIComponent(filter)}`);
@@ -101,6 +117,8 @@ export default {
         const user = (data.items || []).find(u => u.email === email && u.password === hashedPassword);
 
         if (user) {
+          failedLoginMap.delete(email);
+
           return new Response(JSON.stringify({
             id: user.id,
             email: user.email,
@@ -113,11 +131,21 @@ export default {
             headers: { "Content-Type": "application/json", ...corsHeaders } 
           });
         }
+
+        if (loginAttempts.count === 0) {
+          loginAttempts.firstFailTime = now;
+        }
+        loginAttempts.count++;
+        failedLoginMap.set(email, loginAttempts);
+        console.warn(`Hatalı şifre denemesi (${loginAttempts.count}/5): ${email}`);
+
         return new Response(JSON.stringify({ error: "Invalid email or password" }), { 
           status: 401, 
           headers: { "Content-Type": "application/json", ...corsHeaders } 
         });
+
       } catch (e) {
+        console.error("Login API - Beklenmeyen Sunucu Hatası:", e.message, e.stack);
         return new Response(JSON.stringify({ error: "Server Error" }), { 
           status: 500, 
           headers: { "Content-Type": "application/json", ...corsHeaders } 
@@ -131,6 +159,7 @@ export default {
         try {
           body = await request.json();
         } catch (err) {
+          console.error("Register API - JSON Parse Hatası:", err.message);
           return new Response(JSON.stringify({ error: "Invalid JSON payload" }), { 
             status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } 
           });
@@ -171,10 +200,13 @@ export default {
           })
         });
 
-        if (!insertRes.ok) return new Response(JSON.stringify({ error: "Registration failed" }), { 
-          status: 500, 
-          headers: { "Content-Type": "application/json", ...corsHeaders } 
-        });
+        if (!insertRes.ok) {
+          console.error("Register API - Oracle DB Kayıt Başarısız. Status:", insertRes.status);
+          return new Response(JSON.stringify({ error: "Registration failed" }), { 
+            status: 500, 
+            headers: { "Content-Type": "application/json", ...corsHeaders } 
+          });
+        }
 
         return new Response(JSON.stringify({ 
           id: secureId, 
@@ -188,6 +220,7 @@ export default {
           headers: { "Content-Type": "application/json", ...corsHeaders } 
         });
       } catch (e) {
+        console.error("Register API - Beklenmeyen Sunucu Hatası:", e.message, e.stack);
         return new Response(JSON.stringify({ error: "Server Error" }), { 
           status: 500, 
           headers: { "Content-Type": "application/json", ...corsHeaders } 
@@ -223,25 +256,34 @@ export default {
       redirect: 'follow'
     });
 
-    const response = await fetch(newRequest);
-    const responseHeaders = new Headers(response.headers);
-    responseHeaders.set("Access-Control-Allow-Origin", "*");
-    
-    let finalResponse = new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: responseHeaders
-    });
+    try {
+      const response = await fetch(newRequest);
+      const responseHeaders = new Headers(response.headers);
+      responseHeaders.set("Access-Control-Allow-Origin", "*");
+      
+      let finalResponse = new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders
+      });
 
-    if (isCacheable && finalResponse.status === 200) {
-      finalResponse.headers.set("X-Cache", "MISS");
-      finalResponse.headers.set("Cache-Control", "public, max-age=300");
-      ctx.waitUntil(cache.put(cacheKey, finalResponse.clone()));
-    } else {
-      finalResponse.headers.set("X-Cache", "BYPASS");
-      finalResponse.headers.set("Cache-Control", "no-cache");
+      if (isCacheable && finalResponse.status === 200) {
+        finalResponse.headers.set("X-Cache", "MISS");
+        finalResponse.headers.set("Cache-Control", "public, max-age=300");
+        ctx.waitUntil(cache.put(cacheKey, finalResponse.clone()));
+      } else {
+        finalResponse.headers.set("X-Cache", "BYPASS");
+        finalResponse.headers.set("Cache-Control", "no-cache");
+      }
+
+      return finalResponse;
+
+    } catch (proxyError) {
+      console.error(`Proxy Hatası (${targetUrl}):`, proxyError.message, proxyError.stack);
+      return new Response(JSON.stringify({ error: "Veritabanı sunucusuna bağlanılamadı." }), {
+        status: 502, 
+        headers: { "Content-Type": "application/json", ...corsHeaders }
+      });
     }
-
-    return finalResponse;
   },
 };
